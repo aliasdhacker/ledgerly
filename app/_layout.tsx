@@ -1,8 +1,31 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { PostHogProvider } from 'posthog-react-native';
+import { NotificationService } from '../src/services/NotificationService';
+import { DatabaseService } from '../src/services/DatabaseService';
 
 export default function Layout() {
+  useEffect(() => {
+    // Initialize database and request notification permissions on app start
+    const initApp = async () => {
+      DatabaseService.init();
+
+      // Request notification permissions
+      const granted = await NotificationService.requestPermissions();
+
+      if (granted) {
+        // If daily reminder was previously enabled, re-schedule it
+        if (NotificationService.isDailyReminderEnabled()) {
+          const { hour, minute } = NotificationService.getReminderTime();
+          await NotificationService.scheduleDailyReminder(hour, minute);
+        }
+      }
+    };
+
+    initApp();
+  }, []);
+
   return (
     <PostHogProvider
       apiKey="phc_S53mwouff8agLuQBAisjZZJU4fbjOBkizHVycrbQzxr"
@@ -66,6 +89,15 @@ export default function Layout() {
             title: 'Income',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="cash" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="settings"
+          options={{
+            title: 'Settings',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="settings" size={size} color={color} />
             ),
           }}
         />
