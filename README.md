@@ -1,50 +1,102 @@
-# Welcome to your Expo app 👋
+# Ledgerly
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A personal finance app that answers: *"How much money do I actually have right now?"*
 
-## Get started
+Unlike traditional budget apps that track historical spending, Ledgerly focuses on **cash flow forecasting** and daily bill management.
 
-1. Install dependencies
+## Philosophy
 
-   ```bash
-   npm install
-   ```
+**Offline-First**: The app functions 100% locally using SQLite. Cloud sync (planned) serves only as backup, not a runtime dependency.
 
-2. Start the app
+## Features
 
-   ```bash
-   npx expo start
-   ```
+- **Draft Screen**: See your running balance and "Safe to Spend" amount
+- **Bill Management**: Add, track, and mark bills as paid
+- **Transaction Ledger**: Full history of all financial activity
+- **Income Tracking**: Record income with instant balance updates
+- **Auto-Recurring**: Paid bills automatically create next month's entry
 
-In the output, you'll find options to open the app in a
+## Tech Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- **Framework**: React Native (Expo SDK 54)
+- **Language**: TypeScript
+- **Database**: SQLite (expo-sqlite)
+- **Navigation**: Expo Router (file-based)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Getting Started
 
-## Get a fresh project
+### Prerequisites
 
-When you're ready, run:
+- Node.js 18+
+- npm or yarn
+- Expo CLI
+- iOS Simulator (macOS) or Android Emulator
+
+### Installation
 
 ```bash
-npm run reset-project
+# Clone the repository
+git clone <repo-url>
+cd ledgerly
+
+# Install dependencies
+npm install
+
+# Start the development server
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Running the App
 
-## Learn more
+```bash
+# iOS Simulator
+npx expo run:ios
 
-To learn more about developing your project with Expo, look at the following resources:
+# Android Emulator
+npx expo run:android
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+# Expo Go (limited features)
+npx expo start
+```
 
-## Join the community
+## Project Structure
 
-Join our community of developers creating universal apps.
+```
+/app                    # Expo Router screens
+  _layout.tsx           # Tab navigation
+  index.tsx             # Draft (main dashboard)
+  bills.tsx             # Bills list
+  add.tsx               # Add bill form
+  transactions.tsx      # Ledger history
+  income.tsx            # Add income
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+/src
+  /services
+    DatabaseService.ts  # SQLite operations
+  /types
+    index.ts            # TypeScript interfaces
+```
+
+## Screens
+
+| Screen | Description |
+|--------|-------------|
+| **Draft** | Running balance, safe to spend, upcoming bills |
+| **Bills** | List all bills, mark paid, delete |
+| **Add Bill** | Create new recurring bill |
+| **Transactions** | Full ledger history |
+| **Income** | Add income to balance |
+
+## Roadmap
+
+See [ledgerly application design and master plan.md](ledgerly%20application%20design%20and%20master%20plan.md) for full details.
+
+- [x] Sprint 1: Foundation (Expo, SQLite, basic screens)
+- [x] Sprint 2: Core Value (Draft calculation, bill tracking)
+- [x] Sprint 2.5: Extended Features (full ledger system)
+- [ ] Sprint 3: Polish (notifications, swipe gestures, UI)
+- [ ] Sprint 4: Cloud (Spring Boot backend, AWS sync)
+
+## License
+
+Private - All rights reserved.
