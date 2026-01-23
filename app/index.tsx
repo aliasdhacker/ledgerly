@@ -18,6 +18,7 @@ export default function DraftScreen() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [paidWeekTotal, setPaidWeekTotal] = useState(0);
+  const [totalDebt, setTotalDebt] = useState(0);
   const [unpaidBillsModalVisible, setUnpaidBillsModalVisible] = useState(false);
 
   const loadData = useCallback(() => {
@@ -40,6 +41,10 @@ export default function DraftScreen() {
     const paidThisWeek = DatabaseService.getBillsPaidThisWeek();
     const paidWeekSum = paidThisWeek.reduce((sum, b) => sum + b.amount, 0);
     setPaidWeekTotal(paidWeekSum);
+
+    // Get total debt
+    const debt = DatabaseService.getTotalDebt();
+    setTotalDebt(debt);
   }, []);
 
   useFocusEffect(
@@ -119,6 +124,12 @@ export default function DraftScreen() {
             {formatCurrency(safeToSpend)}
           </Text>
           <Text style={styles.resultNote}>Balance minus upcoming bills</Text>
+        </View>
+
+        <View style={styles.debtCard}>
+          <Text style={styles.debtLabel}>Debt Snapshot</Text>
+          <Text style={styles.debtAmount}>{formatCurrency(totalDebt)}</Text>
+          <Text style={styles.debtNote}>Total across all debt accounts</Text>
         </View>
       </ScrollView>
 
@@ -292,6 +303,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8E8E93',
     marginTop: 8,
+  },
+  debtCard: {
+    backgroundColor: '#8E8E93',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  debtLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  debtAmount: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  debtNote: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginTop: 4,
   },
   // Modal styles
   modalOverlay: {

@@ -93,6 +93,15 @@ export default function Layout() {
           }}
         />
         <Tabs.Screen
+          name="debts"
+          options={{
+            title: 'Debts',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="card" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="settings"
           options={{
             title: 'Settings',
