@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Bill, Transaction } from '../types';
+import { Bill, Transaction, Debt } from '../types';
 
 // Open the database (creates it if it doesn't exist)
 const db = SQLite.openDatabaseSync('ledgerly.db');
@@ -29,6 +29,15 @@ interface TransactionRow {
   date: string;
   category: string | null;
   related_bill_id: string | null;
+}
+
+interface DebtRow {
+  id: string;
+  company: string;
+  balance: number;
+  last_updated: string;
+  notes: string | null;
+  sync_status: string;
 }
 
 // Helper to get current month in YYYY-MM format
@@ -88,6 +97,18 @@ export const DatabaseService = {
         date TEXT NOT NULL,
         category TEXT,
         related_bill_id TEXT
+      );
+    `);
+
+    // Create debts table for tracking debt account balances
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS debts (
+        id TEXT PRIMARY KEY NOT NULL,
+        company TEXT NOT NULL,
+        balance REAL NOT NULL,
+        last_updated TEXT NOT NULL,
+        notes TEXT,
+        sync_status TEXT DEFAULT 'dirty'
       );
     `);
 
@@ -380,4 +401,71 @@ export const DatabaseService = {
 
   // Helper: Generate UUID (exposed for external use)
   generateUUID,
+
+  // ============ DEBT OPERATIONS ============
+
+  // Add a debt account
+  addDebt: (debt: Debt) => {
+    const statement = db.prepareSync(
+      'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status) VALUES ($id, $company, $balance, $lastUpdated, $notes, $syncStatus)'
+    );
+    try {
+      statement.executeSync({
+        $id: debt.id,
+        $company: debt.company,
+        $balance: debt.balance,
+        $lastUpdated: debt.lastUpdated,
+        $notes: debt.notes || null,
+        $syncStatus: 'dirty',
+      });
+    } finally {
+      statement.finalizeSync();
+    }
+  },
+
+  // Get all debts
+  getDebts: (): Debt[] => {
+    const result = db.getAllSync(
+      'SELECT * FROM debts ORDER BY balance DESC'
+    ) as DebtRow[];
+
+    return result.map((row) => ({
+      id: row.id,
+      company: row.company,
+      balance: row.balance,
+      lastUpdated: row.last_updated,
+      notes: row.notes || undefined,
+      syncStatus: row.sync_status as 'synced' | 'dirty' | 'deleted',
+    }));
+  },
+
+  // Update debt balance
+  updateDebtBalance: (id: string, newBalance: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    db.runSync(
+      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ? WHERE id = ?',
+      [newBalance, today, 'dirty', id]
+    );
+  },
+
+  // Update debt details
+  updateDebt: (debt: Debt) => {
+    db.runSync(
+      'UPDATE debts SET company = ?, balance = ?, last_updated = ?, notes = ?, sync_status = ? WHERE id = ?',
+      [debt.company, debt.balance, debt.lastUpdated, debt.notes || null, 'dirty', debt.id]
+    );
+  },
+
+  // Delete a debt
+  deleteDebt: (id: string) => {
+    db.runSync('DELETE FROM debts WHERE id = ?', [id]);
+  },
+
+  // Get total debt balance
+  getTotalDebt: (): number => {
+    const result = db.getAllSync(
+      'SELECT COALESCE(SUM(balance), 0) as total FROM debts'
+    ) as { total: number }[];
+    return result[0]?.total || 0;
+  },
 };

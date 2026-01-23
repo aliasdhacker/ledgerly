@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,15 +7,19 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Animated,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Swipeable } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DatabaseService } from '../src/services/DatabaseService';
 import { Bill } from '../src/types';
 
 export default function BillsScreen() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
   const loadBills = useCallback(() => {
     DatabaseService.init();
@@ -36,11 +40,12 @@ export default function BillsScreen() {
   };
 
   const togglePaid = (bill: Bill) => {
+    // Close any open swipeable
+    swipeableRefs.current.get(bill.id)?.close();
+
     if (bill.isPaid) {
-      // Unmark as paid
       DatabaseService.markBillUnpaid(bill.id);
     } else {
-      // Mark as paid and create next month's bill
       DatabaseService.markBillPaid(bill);
     }
     loadBills();
@@ -76,10 +81,78 @@ export default function BillsScreen() {
     if (billMonth === currentMonth) {
       return '';
     }
-    // It's from a previous month (carried over)
     const [year, month] = billMonth.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return `(from ${date.toLocaleDateString('en-US', { month: 'short' })})`;
+  };
+
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    bill: Bill
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [1, 0.5],
+      extrapolate: 'clamp',
+    });
+
+    const opacity = dragX.interpolate({
+      inputRange: [-100, -50, 0],
+      outputRange: [1, 0.5, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View style={[styles.swipeActions, { opacity }]}>
+        <TouchableOpacity
+          style={styles.deleteAction}
+          onPress={() => handleDeleteBill(bill)}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="trash" size={24} color="#FFF" />
+            <Text style={styles.actionText}>Delete</Text>
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderLeftActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>,
+    bill: Bill
+  ) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 100],
+      outputRange: [0.5, 1],
+      extrapolate: 'clamp',
+    });
+
+    const opacity = dragX.interpolate({
+      inputRange: [0, 50, 100],
+      outputRange: [0, 0.5, 1],
+      extrapolate: 'clamp',
+    });
+
+    const isPaid = bill.isPaid;
+    const actionColor = isPaid ? '#FF9500' : '#34C759';
+    const actionIcon = isPaid ? 'close-circle' : 'checkmark-circle';
+    const actionLabel = isPaid ? 'Unpaid' : 'Paid';
+
+    return (
+      <Animated.View style={[styles.swipeActions, styles.leftActions, { opacity }]}>
+        <TouchableOpacity
+          style={[styles.paidAction, { backgroundColor: actionColor }]}
+          onPress={() => togglePaid(bill)}
+        >
+          <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
+            <Ionicons name={actionIcon} size={24} color="#FFF" />
+            <Text style={styles.actionText}>{actionLabel}</Text>
+          </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
   };
 
   const renderBill = ({ item }: { item: Bill }) => {
@@ -87,43 +160,59 @@ export default function BillsScreen() {
     const isCarriedOver = monthLabel !== '';
 
     return (
-      <View
-        style={[
-          styles.billCard,
-          item.isPaid && styles.billCardPaid,
-          isCarriedOver && styles.billCardOverdue,
-        ]}
+      <Swipeable
+        ref={(ref) => {
+          if (ref) {
+            swipeableRefs.current.set(item.id, ref);
+          }
+        }}
+        renderRightActions={(progress, dragX) =>
+          renderRightActions(progress, dragX, item)
+        }
+        renderLeftActions={(progress, dragX) =>
+          renderLeftActions(progress, dragX, item)
+        }
+        onSwipeableOpen={(direction) => {
+          if (direction === 'left') {
+            togglePaid(item);
+          }
+        }}
+        rightThreshold={40}
+        leftThreshold={40}
+        overshootRight={false}
+        overshootLeft={false}
       >
-        <TouchableOpacity
-          style={styles.billContent}
-          onPress={() => togglePaid(item)}
-          activeOpacity={0.7}
+        <View
+          style={[
+            styles.billCard,
+            item.isPaid && styles.billCardPaid,
+            isCarriedOver && styles.billCardOverdue,
+          ]}
         >
-          <View style={styles.billLeft}>
-            <View style={[styles.checkbox, item.isPaid && styles.checkboxChecked]}>
-              {item.isPaid && <Ionicons name="checkmark" size={16} color="#FFF" />}
+          <TouchableOpacity
+            style={styles.billContent}
+            onPress={() => togglePaid(item)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.billLeft}>
+              <View style={[styles.checkbox, item.isPaid && styles.checkboxChecked]}>
+                {item.isPaid && <Ionicons name="checkmark" size={16} color="#FFF" />}
+              </View>
+              <View style={styles.billInfo}>
+                <Text style={[styles.billName, item.isPaid && styles.textPaid]}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.billDue, isCarriedOver && styles.textOverdue]}>
+                  Due on the {item.dueDay}th {monthLabel}
+                </Text>
+              </View>
             </View>
-            <View style={styles.billInfo}>
-              <Text style={[styles.billName, item.isPaid && styles.textPaid]}>
-                {item.name}
-              </Text>
-              <Text style={[styles.billDue, isCarriedOver && styles.textOverdue]}>
-                Due on the {item.dueDay}th {monthLabel}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.billAmount, item.isPaid && styles.textPaid]}>
-            {formatCurrency(item.amount)}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteBill(item)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-        </TouchableOpacity>
-      </View>
+            <Text style={[styles.billAmount, item.isPaid && styles.textPaid]}>
+              {formatCurrency(item.amount)}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Swipeable>
     );
   };
 
@@ -132,14 +221,13 @@ export default function BillsScreen() {
   const totalUnpaid = unpaidBills.reduce((sum, b) => sum + b.amount, 0);
   const totalPaid = paidBills.reduce((sum, b) => sum + b.amount, 0);
 
-  // Get current month name for header
   const currentMonthName = new Date().toLocaleDateString('en-US', {
     month: 'long',
     year: 'numeric',
   });
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Bills</Text>
@@ -150,6 +238,11 @@ export default function BillsScreen() {
             {formatCurrency(totalUnpaid)} pending
           </Text>
         </View>
+      </View>
+
+      <View style={styles.swipeHint}>
+        <Ionicons name="swap-horizontal" size={14} color="#8E8E93" />
+        <Text style={styles.swipeHintText}>Swipe left to delete, right to mark paid</Text>
       </View>
 
       {bills.length === 0 ? (
@@ -185,7 +278,7 @@ export default function BillsScreen() {
           }
         />
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -223,6 +316,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  swipeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+  },
+  swipeHintText: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
   listContent: {
     padding: 20,
     paddingTop: 10,
@@ -250,10 +354,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-  },
-  deleteButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
   },
   billCardPaid: {
     backgroundColor: '#F2F2F7',
@@ -307,6 +407,35 @@ const styles = StyleSheet.create({
   textPaid: {
     color: '#8E8E93',
     textDecorationLine: 'line-through',
+  },
+  swipeActions: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  leftActions: {
+    marginRight: 0,
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 12,
+  },
+  paidAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 12,
+  },
+  actionText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
   emptyState: {
     flex: 1,

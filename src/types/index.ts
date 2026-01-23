@@ -17,3 +17,12 @@ export interface Transaction {
   category?: string;
   relatedBillId?: string; // For bill_paid transactions
 }
+
+export interface Debt {
+  id: string; // UUID
+  company: string; // Name of creditor/company
+  balance: number; // Current balance owed
+  lastUpdated: string; // ISO date string - when balance was last updated
+  notes?: string; // Optional notes
+  syncStatus: 'synced' | 'dirty' | 'deleted';
+}
