@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,8 +9,10 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { DatabaseService } from '../src/services/DatabaseService';
 import { Bill } from '../src/types';
 
@@ -19,6 +21,15 @@ export default function AddBillScreen() {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [dueDay, setDueDay] = useState('');
+
+  // Clear form when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setName('');
+      setAmount('');
+      setDueDay('');
+    }, [])
+  );
 
   const generateUUID = () => {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -69,63 +80,65 @@ export default function AddBillScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Add Bill</Text>
-          <Text style={styles.subtitle}>Track a recurring expense</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bill Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Netflix, Electric Bill"
-              value={name}
-              onChangeText={setName}
-              placeholderTextColor="#8E8E93"
-              autoCapitalize="words"
-            />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.title}>Add Bill</Text>
+            <Text style={styles.subtitle}>Track a recurring expense</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="$0.00"
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              placeholderTextColor="#8E8E93"
-            />
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Bill Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Netflix, Electric Bill"
+                value={name}
+                onChangeText={setName}
+                placeholderTextColor="#8E8E93"
+                autoCapitalize="words"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Amount</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="$0.00"
+                value={amount}
+                onChangeText={setAmount}
+                keyboardType="decimal-pad"
+                placeholderTextColor="#8E8E93"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Due Day of Month</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="1-31"
+                value={dueDay}
+                onChangeText={setDueDay}
+                keyboardType="number-pad"
+                placeholderTextColor="#8E8E93"
+                maxLength={2}
+              />
+              <Text style={styles.hint}>
+                The day of the month this bill is typically due
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Due Day of Month</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="1-31"
-              value={dueDay}
-              onChangeText={setDueDay}
-              keyboardType="number-pad"
-              placeholderTextColor="#8E8E93"
-              maxLength={2}
-            />
-            <Text style={styles.hint}>
-              The day of the month this bill is typically due
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Save Bill</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.saveButtonText}>Save Bill</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 

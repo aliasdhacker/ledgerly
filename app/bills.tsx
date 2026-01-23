@@ -14,10 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DatabaseService } from '../src/services/DatabaseService';
-import { Bill } from '../src/types';
+import { Bill, Debt } from '../src/types';
 
 export default function BillsScreen() {
   const [bills, setBills] = useState<Bill[]>([]);
+  const [upcomingDebtPayments, setUpcomingDebtPayments] = useState<Debt[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const swipeableRefs = useRef<Map<string, Swipeable>>(new Map());
 
@@ -25,6 +26,10 @@ export default function BillsScreen() {
     DatabaseService.init();
     const loadedBills = DatabaseService.getBillsForCurrentMonth();
     setBills(loadedBills);
+
+    // Load recurring debt payments due within 14 days
+    const upcomingDebts = DatabaseService.getRecurringDebtsDueWithin(14);
+    setUpcomingDebtPayments(upcomingDebts);
   }, []);
 
   useFocusEffect(
@@ -69,6 +74,40 @@ export default function BillsScreen() {
     );
   };
 
+  const handlePayDebt = (debt: Debt) => {
+    const paymentAmount = debt.minimumPayment || 0;
+
+    if (paymentAmount <= 0) {
+      // No minimum payment set, ask user for amount
+      Alert.alert(
+        'Record Payment',
+        `Enter the payment amount for ${debt.company} in the Debts tab.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Record Payment',
+      `Record a payment of ${formatCurrency(paymentAmount)} to ${debt.company}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pay',
+          onPress: () => {
+            DatabaseService.addDebtTransaction(
+              debt.id,
+              'credit',
+              paymentAmount,
+              'Monthly payment'
+            );
+            loadBills();
+          },
+        },
+      ]
+    );
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -84,6 +123,19 @@ export default function BillsScreen() {
     const [year, month] = billMonth.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return `(from ${date.toLocaleDateString('en-US', { month: 'short' })})`;
+  };
+
+  const formatShortDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const getDaysUntil = (dateStr: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr + 'T00:00:00');
+    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
   };
 
   const renderRightActions = (
@@ -216,10 +268,63 @@ export default function BillsScreen() {
     );
   };
 
+  const renderDebtPayment = ({ item }: { item: Debt }) => {
+    const daysUntil = item.nextPaymentDate ? getDaysUntil(item.nextPaymentDate) : null;
+    const isDueSoon = daysUntil !== null && daysUntil <= 7 && daysUntil >= 0;
+    const isOverdue = daysUntil !== null && daysUntil < 0;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.debtPaymentCard,
+          isDueSoon && styles.debtPaymentCardDueSoon,
+          isOverdue && styles.debtPaymentCardOverdue,
+        ]}
+        onPress={() => handlePayDebt(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.debtPaymentContent}>
+          <View style={styles.debtPaymentLeft}>
+            <View style={styles.debtCheckbox}>
+              <Ionicons name="checkmark" size={16} color="#FFF" style={{ opacity: 0 }} />
+            </View>
+            <View style={styles.debtPaymentInfo}>
+              <Text style={styles.debtPaymentName}>{item.company}</Text>
+              <Text style={[
+                styles.debtPaymentDue,
+                isDueSoon && styles.textDueSoon,
+                isOverdue && styles.textOverdue,
+              ]}>
+                {isOverdue
+                  ? `Overdue by ${Math.abs(daysUntil!)} day${Math.abs(daysUntil!) !== 1 ? 's' : ''}`
+                  : daysUntil === 0
+                  ? 'Due today'
+                  : daysUntil === 1
+                  ? 'Due tomorrow'
+                  : `Due ${formatShortDate(item.nextPaymentDate!)} (${daysUntil}d)`}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.debtPaymentAmounts}>
+            {item.minimumPayment && (
+              <Text style={styles.debtPaymentMinimum}>
+                {formatCurrency(item.minimumPayment)}
+              </Text>
+            )}
+            <Text style={styles.debtPaymentBalance}>
+              Bal: {formatCurrency(item.balance)}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const unpaidBills = bills.filter((b) => !b.isPaid);
   const paidBills = bills.filter((b) => b.isPaid);
   const totalUnpaid = unpaidBills.reduce((sum, b) => sum + b.amount, 0);
   const totalPaid = paidBills.reduce((sum, b) => sum + b.amount, 0);
+  const totalDebtPayments = upcomingDebtPayments.reduce((sum, d) => sum + (d.minimumPayment || 0), 0);
 
   const currentMonthName = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -235,7 +340,7 @@ export default function BillsScreen() {
         </View>
         <View style={styles.summaryBadge}>
           <Text style={styles.summaryText}>
-            {formatCurrency(totalUnpaid)} pending
+            {formatCurrency(totalUnpaid + totalDebtPayments)} pending
           </Text>
         </View>
       </View>
@@ -245,7 +350,7 @@ export default function BillsScreen() {
         <Text style={styles.swipeHintText}>Swipe left to delete, right to mark paid</Text>
       </View>
 
-      {bills.length === 0 ? (
+      {bills.length === 0 && upcomingDebtPayments.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="document-text-outline" size={64} color="#C7C7CC" />
           <Text style={styles.emptyTitle}>No Bills Yet</Text>
@@ -263,9 +368,21 @@ export default function BillsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
           ListHeaderComponent={
-            unpaidBills.length > 0 ? (
-              <Text style={styles.sectionHeader}>UNPAID</Text>
-            ) : null
+            <>
+              {upcomingDebtPayments.length > 0 && (
+                <View style={styles.debtPaymentsSection}>
+                  <Text style={styles.sectionHeader}>UPCOMING DEBT PAYMENTS</Text>
+                  {upcomingDebtPayments.map((debt) => (
+                    <View key={debt.id}>
+                      {renderDebtPayment({ item: debt })}
+                    </View>
+                  ))}
+                </View>
+              )}
+              {unpaidBills.length > 0 && (
+                <Text style={styles.sectionHeader}>UNPAID BILLS</Text>
+              )}
+            </>
           }
           ListFooterComponent={
             paidBills.length > 0 ? (
@@ -454,5 +571,88 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     marginTop: 8,
     textAlign: 'center',
+  },
+  // Debt payment styles
+  debtPaymentCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  debtPaymentCardDueSoon: {
+    borderLeftColor: '#FF9500',
+  },
+  debtPaymentCardOverdue: {
+    borderLeftColor: '#FF3B30',
+  },
+  debtPaymentContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  debtPaymentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  debtCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FF9500',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  debtPaymentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF9500',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  debtPaymentIconDueSoon: {
+    backgroundColor: '#FF9500',
+  },
+  debtPaymentIconOverdue: {
+    backgroundColor: '#FF3B30',
+  },
+  debtPaymentInfo: {
+    flex: 1,
+  },
+  debtPaymentName: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+  },
+  debtPaymentDue: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  textDueSoon: {
+    color: '#FF9500',
+    fontWeight: '600',
+  },
+  debtPaymentAmounts: {
+    alignItems: 'flex-end',
+  },
+  debtPaymentMinimum: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FF9500',
+  },
+  debtPaymentBalance: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  debtPaymentsSection: {
+    marginBottom: 10,
   },
 });

@@ -12,6 +12,7 @@ import {
 import { useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NotificationService } from '../src/services/NotificationService';
+import { DatabaseService } from '../src/services/DatabaseService';
 
 export default function SettingsScreen() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -107,6 +108,37 @@ export default function SettingsScreen() {
     Alert.alert('Test Sent', 'You should receive a notification in 2 seconds');
   };
 
+  const handleDeleteAllData = () => {
+    Alert.alert(
+      'Delete All Data',
+      'Are you sure you want to delete ALL data? This will permanently remove all bills, debts, transactions, and account information. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'This is your last chance. All your financial data will be permanently deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'DELETE ALL',
+                  style: 'destructive',
+                  onPress: () => {
+                    DatabaseService.deleteAllData();
+                    Alert.alert('Data Deleted', 'All data has been permanently deleted.');
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
@@ -172,6 +204,16 @@ export default function SettingsScreen() {
           <Text style={styles.aboutLabel}>Package</Text>
           <Text style={styles.aboutValue}>com.ledgerly.mobile</Text>
         </View>
+      </View>
+
+      <View style={styles.dangerSection}>
+        <Text style={styles.dangerSectionTitle}>Danger Zone</Text>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteAllData}
+        >
+          <Text style={styles.deleteButtonText}>DELETE ALL DATA</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -254,5 +296,33 @@ const styles = StyleSheet.create({
   aboutValue: {
     fontSize: 16,
     color: '#8E8E93',
+  },
+  dangerSection: {
+    backgroundColor: '#FFFFFF',
+    marginTop: 20,
+    marginHorizontal: 16,
+    marginBottom: 40,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  dangerSectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 16,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
 });

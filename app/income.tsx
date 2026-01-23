@@ -9,6 +9,8 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { DatabaseService } from '../src/services/DatabaseService';
@@ -66,54 +68,56 @@ export default function IncomeScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Income</Text>
-          <Text style={styles.subtitle}>Add income to your ledger</Text>
-        </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Text style={styles.title}>Income</Text>
+            <Text style={styles.subtitle}>Add income to your ledger</Text>
+          </View>
 
-        <View style={styles.currentBalanceCard}>
-          <Text style={styles.currentBalanceLabel}>Running Balance</Text>
-          <Text style={[
-            styles.currentBalanceAmount,
-            currentBalance < 0 && styles.negativeBalance
-          ]}>
-            {formatCurrency(currentBalance)}
-          </Text>
-        </View>
+          <View style={styles.currentBalanceCard}>
+            <Text style={styles.currentBalanceLabel}>Running Balance</Text>
+            <Text style={[
+              styles.currentBalanceAmount,
+              currentBalance < 0 && styles.negativeBalance
+            ]}>
+              {formatCurrency(currentBalance)}
+            </Text>
+          </View>
 
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Description (optional)</Text>
-          <TextInput
-            style={styles.inputDescription}
-            placeholder="e.g., Paycheck, Bonus"
-            value={description}
-            onChangeText={setDescription}
-            placeholderTextColor="#8E8E93"
-          />
-        </View>
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Description (optional)</Text>
+            <TextInput
+              style={styles.inputDescription}
+              placeholder="e.g., Paycheck, Bonus"
+              value={description}
+              onChangeText={setDescription}
+              placeholderTextColor="#8E8E93"
+            />
+          </View>
 
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Amount</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="$0.00"
-            keyboardType="decimal-pad"
-            value={incomeAmount}
-            onChangeText={setIncomeAmount}
-            placeholderTextColor="#8E8E93"
-          />
-        </View>
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Amount</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="$0.00"
+              keyboardType="decimal-pad"
+              value={incomeAmount}
+              onChangeText={setIncomeAmount}
+              placeholderTextColor="#8E8E93"
+            />
+          </View>
 
-        <TouchableOpacity style={styles.addButton} onPress={handleAddIncome}>
-          <Text style={styles.addButtonText}>Add Income</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <TouchableOpacity style={styles.addButton} onPress={handleAddIncome}>
+            <Text style={styles.addButtonText}>Add Income</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 

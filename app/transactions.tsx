@@ -9,6 +9,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -186,113 +188,116 @@ export default function TransactionsScreen() {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title}>Ledger</Text>
-        <Text style={styles.subtitle}>All transactions</Text>
-      </View>
-
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Running Balance</Text>
-        <Text style={[
-          styles.balanceAmount,
-          runningBalance < 0 && styles.negativeBalance
-        ]}>
-          {formatCurrency(runningBalance)}
-        </Text>
-      </View>
-
-      <View style={styles.addSection}>
-        <Text style={styles.sectionTitle}>Quick Add</Text>
-        <View style={styles.typeSelector}>
-          <TouchableOpacity
-            style={[
-              styles.typeButton,
-              transactionType === 'expense' && styles.typeButtonActiveExpense,
-            ]}
-            onPress={() => setTransactionType('expense')}
-          >
-            <Text
-              style={[
-                styles.typeButtonText,
-                transactionType === 'expense' && styles.typeButtonTextActive,
-              ]}
-            >
-              Expense
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.typeButton,
-              transactionType === 'credit' && styles.typeButtonActiveCredit,
-            ]}
-            onPress={() => setTransactionType('credit')}
-          >
-            <Text
-              style={[
-                styles.typeButtonText,
-                transactionType === 'credit' && styles.typeButtonTextActive,
-              ]}
-            >
-              Credit
-            </Text>
-          </TouchableOpacity>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Ledger</Text>
+          <Text style={styles.subtitle}>All transactions</Text>
         </View>
 
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.descriptionInput]}
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-            placeholderTextColor="#8E8E93"
-          />
-          <TextInput
-            style={[styles.input, styles.amountInput]}
-            placeholder="$0.00"
-            value={amount}
-            onChangeText={setAmount}
-            keyboardType="decimal-pad"
-            placeholderTextColor="#8E8E93"
-          />
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.addButton,
-            transactionType === 'expense' ? styles.addButtonExpense : styles.addButtonCredit,
-          ]}
-          onPress={handleAddTransaction}
-        >
-          <Ionicons name="add" size={20} color="#FFF" />
-          <Text style={styles.addButtonText}>
-            Add {transactionType === 'expense' ? 'Expense' : 'Credit'}
+        <View style={styles.balanceCard}>
+          <Text style={styles.balanceLabel}>Running Balance</Text>
+          <Text style={[
+            styles.balanceAmount,
+            runningBalance < 0 && styles.negativeBalance
+          ]}>
+            {formatCurrency(runningBalance)}
           </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
 
-      <View style={styles.historyHeader}>
-        <Text style={styles.historyTitle}>History</Text>
-        <Text style={styles.historyCount}>{transactions.length} transactions</Text>
-      </View>
-
-      <FlatList
-        data={transactions}
-        keyExtractor={(item) => item.id}
-        renderItem={renderTransaction}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={48} color="#C7C7CC" />
-            <Text style={styles.emptyText}>No transactions yet</Text>
-            <Text style={styles.emptySubtext}>Add income or expenses to get started</Text>
+        <View style={styles.addSection}>
+          <Text style={styles.sectionTitle}>Quick Add</Text>
+          <View style={styles.typeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                transactionType === 'expense' && styles.typeButtonActiveExpense,
+              ]}
+              onPress={() => setTransactionType('expense')}
+            >
+              <Text
+                style={[
+                  styles.typeButtonText,
+                  transactionType === 'expense' && styles.typeButtonTextActive,
+                ]}
+              >
+                Expense
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.typeButton,
+                transactionType === 'credit' && styles.typeButtonActiveCredit,
+              ]}
+              onPress={() => setTransactionType('credit')}
+            >
+              <Text
+                style={[
+                  styles.typeButtonText,
+                  transactionType === 'credit' && styles.typeButtonTextActive,
+                ]}
+              >
+                Credit
+              </Text>
+            </TouchableOpacity>
           </View>
-        }
-      />
-    </KeyboardAvoidingView>
+
+          <View style={styles.inputRow}>
+            <TextInput
+              style={[styles.input, styles.descriptionInput]}
+              placeholder="Description"
+              value={description}
+              onChangeText={setDescription}
+              placeholderTextColor="#8E8E93"
+            />
+            <TextInput
+              style={[styles.input, styles.amountInput]}
+              placeholder="$0.00"
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="decimal-pad"
+              placeholderTextColor="#8E8E93"
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.addButton,
+              transactionType === 'expense' ? styles.addButtonExpense : styles.addButtonCredit,
+            ]}
+            onPress={handleAddTransaction}
+          >
+            <Ionicons name="add" size={20} color="#FFF" />
+            <Text style={styles.addButtonText}>
+              Add {transactionType === 'expense' ? 'Expense' : 'Credit'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyTitle}>History</Text>
+          <Text style={styles.historyCount}>{transactions.length} transactions</Text>
+        </View>
+
+        <FlatList
+          data={transactions}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTransaction}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="receipt-outline" size={48} color="#C7C7CC" />
+              <Text style={styles.emptyText}>No transactions yet</Text>
+              <Text style={styles.emptySubtext}>Add income or expenses to get started</Text>
+            </View>
+          }
+        />
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 

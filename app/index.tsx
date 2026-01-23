@@ -11,7 +11,7 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { DatabaseService } from '../src/services/DatabaseService';
-import { Bill } from '../src/types';
+import { Bill, Debt } from '../src/types';
 
 export default function DraftScreen() {
   const [runningBalance, setRunningBalance] = useState(0);
@@ -20,6 +20,8 @@ export default function DraftScreen() {
   const [paidWeekTotal, setPaidWeekTotal] = useState(0);
   const [totalDebt, setTotalDebt] = useState(0);
   const [unpaidBillsModalVisible, setUnpaidBillsModalVisible] = useState(false);
+  const [upcomingDebtPayments, setUpcomingDebtPayments] = useState<Debt[]>([]);
+  const [upcomingDebtTotal, setUpcomingDebtTotal] = useState(0);
 
   const loadData = useCallback(() => {
     DatabaseService.init();
@@ -45,6 +47,12 @@ export default function DraftScreen() {
     // Get total debt
     const debt = DatabaseService.getTotalDebt();
     setTotalDebt(debt);
+
+    // Get recurring debt payments due within 14 days
+    const upcomingDebts = DatabaseService.getRecurringDebtsDueWithin(14);
+    setUpcomingDebtPayments(upcomingDebts);
+    const debtPaymentTotal = DatabaseService.getUpcomingDebtPaymentsTotal(14);
+    setUpcomingDebtTotal(debtPaymentTotal);
   }, []);
 
   useFocusEffect(
@@ -60,11 +68,19 @@ export default function DraftScreen() {
     }).format(amount);
   };
 
+  const formatDateShort = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const unpaidBills = bills.filter((b) => !b.isPaid);
   const unpaidCount = unpaidBills.length;
+  const upcomingDebtCount = upcomingDebtPayments.length;
+  const totalUpcomingCount = unpaidCount + upcomingDebtCount;
+  const totalUpcomingAmount = pendingTotal + upcomingDebtTotal;
 
-  // Safe to spend = running balance - unpaid bills
-  const safeToSpend = runningBalance - pendingTotal;
+  // Safe to spend = running balance - unpaid bills - upcoming debt payments
+  const safeToSpend = runningBalance - totalUpcomingAmount;
 
   return (
     <View style={styles.container}>
@@ -91,10 +107,10 @@ export default function DraftScreen() {
             onPress={() => setUnpaidBillsModalVisible(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.summaryLabel}>Upcoming Bills ({unpaidCount})</Text>
+            <Text style={styles.summaryLabel}>Upcoming ({totalUpcomingCount})</Text>
             <View style={styles.summaryRight}>
               <Text style={[styles.summaryValue, styles.textPending]}>
-                {formatCurrency(pendingTotal)}
+                {formatCurrency(totalUpcomingAmount)}
               </Text>
               <Ionicons name="chevron-forward" size={16} color="#8E8E93" />
             </View>
@@ -123,7 +139,7 @@ export default function DraftScreen() {
           >
             {formatCurrency(safeToSpend)}
           </Text>
-          <Text style={styles.resultNote}>Balance minus upcoming bills</Text>
+          <Text style={styles.resultNote}>Balance minus upcoming payments</Text>
         </View>
 
         <View style={styles.debtCard}>
@@ -143,7 +159,7 @@ export default function DraftScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Upcoming Bills</Text>
+              <Text style={styles.modalTitle}>Upcoming Payments</Text>
               <TouchableOpacity
                 onPress={() => setUnpaidBillsModalVisible(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -155,29 +171,60 @@ export default function DraftScreen() {
             <View style={styles.modalTotalCard}>
               <Text style={styles.modalTotalLabel}>Total Due</Text>
               <Text style={styles.modalTotalAmount}>
-                {formatCurrency(pendingTotal)}
+                {formatCurrency(totalUpcomingAmount)}
               </Text>
             </View>
 
-            <FlatList
-              data={unpaidBills}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.modalBillRow}>
-                  <View>
-                    <Text style={styles.modalBillName}>{item.name}</Text>
-                    <Text style={styles.modalBillDue}>Due on the {item.dueDay}th</Text>
-                  </View>
-                  <Text style={styles.modalBillAmount}>
-                    {formatCurrency(item.amount)}
-                  </Text>
-                </View>
+            <ScrollView contentContainerStyle={styles.modalList}>
+              {/* Unpaid Bills Section */}
+              {unpaidBills.length > 0 && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Bills ({unpaidCount})</Text>
+                  {unpaidBills.map((item) => (
+                    <View key={item.id} style={styles.modalBillRow}>
+                      <View>
+                        <Text style={styles.modalBillName}>{item.name}</Text>
+                        <Text style={styles.modalBillDue}>Due on the {item.dueDay}th</Text>
+                      </View>
+                      <Text style={styles.modalBillAmount}>
+                        {formatCurrency(item.amount)}
+                      </Text>
+                    </View>
+                  ))}
+                </>
               )}
-              ListEmptyComponent={
-                <Text style={styles.modalEmpty}>No upcoming bills</Text>
-              }
-              contentContainerStyle={styles.modalList}
-            />
+
+              {/* Debt Payments Section */}
+              {upcomingDebtPayments.length > 0 && (
+                <>
+                  <Text style={styles.modalSectionTitle}>Debt Payments ({upcomingDebtCount})</Text>
+                  {upcomingDebtPayments.map((item) => (
+                    <View key={item.id} style={styles.modalDebtRow}>
+                      <View>
+                        <Text style={styles.modalBillName}>{item.company}</Text>
+                        <Text style={styles.modalBillDue}>
+                          Due {item.nextPaymentDate ? formatDateShort(item.nextPaymentDate) : 'soon'}
+                        </Text>
+                      </View>
+                      <View style={styles.modalDebtAmounts}>
+                        {item.minimumPayment && (
+                          <Text style={styles.modalDebtPayment}>
+                            {formatCurrency(item.minimumPayment)}
+                          </Text>
+                        )}
+                        <Text style={styles.modalDebtBalance}>
+                          Bal: {formatCurrency(item.balance)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </>
+              )}
+
+              {unpaidBills.length === 0 && upcomingDebtPayments.length === 0 && (
+                <Text style={styles.modalEmpty}>No upcoming payments</Text>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -408,5 +455,37 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontSize: 17,
     paddingVertical: 20,
+  },
+  modalSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    marginTop: 10,
+  },
+  modalDebtRow: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9500',
+  },
+  modalDebtAmounts: {
+    alignItems: 'flex-end',
+  },
+  modalDebtPayment: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FF9500',
+  },
+  modalDebtBalance: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 2,
   },
 });
