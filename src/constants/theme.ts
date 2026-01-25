@@ -1,4 +1,4 @@
-// Ledgerly Design System
+// Driftmoney Design System
 // Consistent colors, typography, and spacing across the app
 
 export const Colors = {

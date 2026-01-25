@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { Bill, Transaction, Debt, DebtTransaction, PaymentFrequency } from '../types';
 
 // Open the database (creates it if it doesn't exist)
-const db = SQLite.openDatabaseSync('ledgerly.db');
+const db = SQLite.openDatabaseSync('driftmoney.db');
 
 // Internal interface for raw SQL results (snake_case)
 interface BillRow {
@@ -14,6 +14,7 @@ interface BillRow {
   bill_month: string;
   sync_status: string;
   paid_at: string | null;
+  updated_at: string;
 }
 
 interface SettingRow {
@@ -29,6 +30,8 @@ interface TransactionRow {
   date: string;
   category: string | null;
   related_bill_id: string | null;
+  sync_status: string;
+  updated_at: string;
 }
 
 interface DebtRow {
@@ -43,6 +46,7 @@ interface DebtRow {
   payment_frequency: string | null;
   minimum_payment: number | null;
   next_payment_date: string | null;
+  updated_at: string;
 }
 
 interface DebtTransactionRow {
@@ -53,6 +57,8 @@ interface DebtTransactionRow {
   description: string;
   date: string;
   balance_after: number;
+  sync_status: string;
+  updated_at: string;
 }
 
 // Helper to get current month in YYYY-MM format
@@ -90,7 +96,8 @@ export const DatabaseService = {
         is_paid INTEGER DEFAULT 0,
         bill_month TEXT NOT NULL,
         sync_status TEXT DEFAULT 'dirty',
-        paid_at TEXT
+        paid_at TEXT,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -111,7 +118,9 @@ export const DatabaseService = {
         type TEXT NOT NULL,
         date TEXT NOT NULL,
         category TEXT,
-        related_bill_id TEXT
+        related_bill_id TEXT,
+        sync_status TEXT DEFAULT 'dirty',
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -128,7 +137,8 @@ export const DatabaseService = {
         payment_due_day INTEGER,
         payment_frequency TEXT,
         minimum_payment REAL,
-        next_payment_date TEXT
+        next_payment_date TEXT,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -142,6 +152,8 @@ export const DatabaseService = {
         description TEXT NOT NULL,
         date TEXT NOT NULL,
         balance_after REAL NOT NULL,
+        sync_status TEXT DEFAULT 'dirty',
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (debt_id) REFERENCES debts(id) ON DELETE CASCADE
       );
     `);
@@ -152,6 +164,15 @@ export const DatabaseService = {
       const hasRelatedBillId = transTableInfo.some(col => col.name === 'related_bill_id');
       if (!hasRelatedBillId) {
         db.execSync(`ALTER TABLE transactions ADD COLUMN related_bill_id TEXT`);
+      }
+      const hasSyncStatus = transTableInfo.some(col => col.name === 'sync_status');
+      if (!hasSyncStatus) {
+        db.execSync(`ALTER TABLE transactions ADD COLUMN sync_status TEXT DEFAULT 'dirty'`);
+      }
+      const hasUpdatedAt = transTableInfo.some(col => col.name === 'updated_at');
+      if (!hasUpdatedAt) {
+        db.execSync(`ALTER TABLE transactions ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`);
+        db.runSync(`UPDATE transactions SET updated_at = datetime('now') WHERE updated_at IS NULL`);
       }
     } catch {
       // Column likely already exists
@@ -168,6 +189,11 @@ export const DatabaseService = {
         db.execSync(`ALTER TABLE debts ADD COLUMN minimum_payment REAL`);
         db.execSync(`ALTER TABLE debts ADD COLUMN next_payment_date TEXT`);
       }
+      const hasUpdatedAt = debtTableInfo.some(col => col.name === 'updated_at');
+      if (!hasUpdatedAt) {
+        db.execSync(`ALTER TABLE debts ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`);
+        db.runSync(`UPDATE debts SET updated_at = datetime('now') WHERE updated_at IS NULL`);
+      }
     } catch {
       // Columns likely already exist
     }
@@ -177,6 +203,7 @@ export const DatabaseService = {
       const tableInfo = db.getAllSync("PRAGMA table_info(bills)") as { name: string }[];
       const hasBillMonth = tableInfo.some(col => col.name === 'bill_month');
       const hasPaidAt = tableInfo.some(col => col.name === 'paid_at');
+      const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at');
 
       if (!hasBillMonth) {
         const currentMonth = getCurrentMonth();
@@ -187,15 +214,37 @@ export const DatabaseService = {
       if (!hasPaidAt) {
         db.execSync(`ALTER TABLE bills ADD COLUMN paid_at TEXT`);
       }
+
+      if (!hasUpdatedAt) {
+        db.execSync(`ALTER TABLE bills ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`);
+        db.runSync(`UPDATE bills SET updated_at = datetime('now') WHERE updated_at IS NULL`);
+      }
     } catch {
       // Column likely already exists or table is new
+    }
+
+    // Migrate debt_transactions table for sync
+    try {
+      const debtTransTableInfo = db.getAllSync("PRAGMA table_info(debt_transactions)") as { name: string }[];
+      const hasSyncStatus = debtTransTableInfo.some(col => col.name === 'sync_status');
+      if (!hasSyncStatus) {
+        db.execSync(`ALTER TABLE debt_transactions ADD COLUMN sync_status TEXT DEFAULT 'dirty'`);
+      }
+      const hasUpdatedAt = debtTransTableInfo.some(col => col.name === 'updated_at');
+      if (!hasUpdatedAt) {
+        db.execSync(`ALTER TABLE debt_transactions ADD COLUMN updated_at TEXT DEFAULT CURRENT_TIMESTAMP`);
+        db.runSync(`UPDATE debt_transactions SET updated_at = datetime('now') WHERE updated_at IS NULL`);
+      }
+    } catch {
+      // Columns likely already exist
     }
   },
 
   // 2. Add a Bill (creates for current month)
   addBill: (bill: Bill) => {
+    const now = new Date().toISOString();
     const statement = db.prepareSync(
-      'INSERT INTO bills (id, name, amount, due_day, is_paid, bill_month, sync_status) VALUES ($id, $name, $amount, $dueDay, $isPaid, $billMonth, $syncStatus)'
+      'INSERT INTO bills (id, name, amount, due_day, is_paid, bill_month, sync_status, updated_at) VALUES ($id, $name, $amount, $dueDay, $isPaid, $billMonth, $syncStatus, $updatedAt)'
     );
     try {
       statement.executeSync({
@@ -205,7 +254,8 @@ export const DatabaseService = {
         $dueDay: bill.dueDay,
         $isPaid: bill.isPaid ? 1 : 0,
         $billMonth: bill.billMonth || getCurrentMonth(),
-        $syncStatus: 'dirty'
+        $syncStatus: 'dirty',
+        $updatedAt: now
       });
     } finally {
       statement.finalizeSync();
@@ -255,15 +305,15 @@ export const DatabaseService = {
     const paidAt = new Date().toISOString();
     const today = paidAt.split('T')[0];
     db.runSync(
-      'UPDATE bills SET is_paid = 1, sync_status = ?, paid_at = ? WHERE id = ?',
-      ['dirty', paidAt, bill.id]
+      'UPDATE bills SET is_paid = 1, sync_status = ?, paid_at = ?, updated_at = ? WHERE id = ?',
+      ['dirty', paidAt, paidAt, bill.id]
     );
 
     // Record as a transaction
     const transactionId = generateUUID();
     db.runSync(
-      'INSERT INTO transactions (id, description, amount, type, date, category, related_bill_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [transactionId, `Bill: ${bill.name}`, bill.amount, 'bill_paid', today, 'Bills', bill.id]
+      'INSERT INTO transactions (id, description, amount, type, date, category, related_bill_id, sync_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [transactionId, `Bill: ${bill.name}`, bill.amount, 'bill_paid', today, 'Bills', bill.id, 'dirty', paidAt]
     );
 
     // Create next month's instance of this bill
@@ -291,9 +341,10 @@ export const DatabaseService = {
 
   // 6. Mark Bill as Unpaid (undo payment)
   markBillUnpaid: (id: string) => {
+    const now = new Date().toISOString();
     db.runSync(
-      'UPDATE bills SET is_paid = 0, sync_status = ?, paid_at = NULL WHERE id = ?',
-      ['dirty', id]
+      'UPDATE bills SET is_paid = 0, sync_status = ?, paid_at = NULL, updated_at = ? WHERE id = ?',
+      ['dirty', now, id]
     );
     // Remove the associated transaction
     db.runSync('DELETE FROM transactions WHERE related_bill_id = ?', [id]);
@@ -346,8 +397,9 @@ export const DatabaseService = {
 
   // 11. Add a transaction
   addTransaction: (transaction: Transaction) => {
+    const now = new Date().toISOString();
     const statement = db.prepareSync(
-      'INSERT INTO transactions (id, description, amount, type, date, category, related_bill_id) VALUES ($id, $description, $amount, $type, $date, $category, $relatedBillId)'
+      'INSERT INTO transactions (id, description, amount, type, date, category, related_bill_id, sync_status, updated_at) VALUES ($id, $description, $amount, $type, $date, $category, $relatedBillId, $syncStatus, $updatedAt)'
     );
     try {
       statement.executeSync({
@@ -358,6 +410,8 @@ export const DatabaseService = {
         $date: transaction.date,
         $category: transaction.category || null,
         $relatedBillId: transaction.relatedBillId || null,
+        $syncStatus: 'dirty',
+        $updatedAt: now,
       });
     } finally {
       statement.finalizeSync();
@@ -455,8 +509,9 @@ export const DatabaseService = {
 
   // Add a debt account
   addDebt: (debt: Debt) => {
+    const now = new Date().toISOString();
     const statement = db.prepareSync(
-      'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status, is_recurring, payment_due_day, payment_frequency, minimum_payment, next_payment_date) VALUES ($id, $company, $balance, $lastUpdated, $notes, $syncStatus, $isRecurring, $paymentDueDay, $paymentFrequency, $minimumPayment, $nextPaymentDate)'
+      'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status, is_recurring, payment_due_day, payment_frequency, minimum_payment, next_payment_date, updated_at) VALUES ($id, $company, $balance, $lastUpdated, $notes, $syncStatus, $isRecurring, $paymentDueDay, $paymentFrequency, $minimumPayment, $nextPaymentDate, $updatedAt)'
     );
     try {
       statement.executeSync({
@@ -471,6 +526,7 @@ export const DatabaseService = {
         $paymentFrequency: debt.paymentFrequency || null,
         $minimumPayment: debt.minimumPayment || null,
         $nextPaymentDate: debt.nextPaymentDate || null,
+        $updatedAt: now,
       });
     } finally {
       statement.finalizeSync();
@@ -500,17 +556,19 @@ export const DatabaseService = {
 
   // Update debt balance
   updateDebtBalance: (id: string, newBalance: number) => {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
     db.runSync(
-      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ? WHERE id = ?',
-      [newBalance, today, 'dirty', id]
+      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+      [newBalance, today, 'dirty', now, id]
     );
   },
 
   // Update debt details
   updateDebt: (debt: Debt) => {
+    const now = new Date().toISOString();
     db.runSync(
-      'UPDATE debts SET company = ?, balance = ?, last_updated = ?, notes = ?, sync_status = ?, is_recurring = ?, payment_due_day = ?, payment_frequency = ?, minimum_payment = ?, next_payment_date = ? WHERE id = ?',
+      'UPDATE debts SET company = ?, balance = ?, last_updated = ?, notes = ?, sync_status = ?, is_recurring = ?, payment_due_day = ?, payment_frequency = ?, minimum_payment = ?, next_payment_date = ?, updated_at = ? WHERE id = ?',
       [
         debt.company,
         debt.balance,
@@ -522,6 +580,7 @@ export const DatabaseService = {
         debt.paymentFrequency || null,
         debt.minimumPayment || null,
         debt.nextPaymentDate || null,
+        now,
         debt.id
       ]
     );
@@ -565,12 +624,13 @@ export const DatabaseService = {
       newBalance = currentBalance - amount;
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
     const transactionId = generateUUID();
 
     // Insert the debt transaction
     const statement = db.prepareSync(
-      'INSERT INTO debt_transactions (id, debt_id, type, amount, description, date, balance_after) VALUES ($id, $debtId, $type, $amount, $description, $date, $balanceAfter)'
+      'INSERT INTO debt_transactions (id, debt_id, type, amount, description, date, balance_after, sync_status, updated_at) VALUES ($id, $debtId, $type, $amount, $description, $date, $balanceAfter, $syncStatus, $updatedAt)'
     );
     try {
       statement.executeSync({
@@ -581,6 +641,8 @@ export const DatabaseService = {
         $description: description,
         $date: today,
         $balanceAfter: newBalance,
+        $syncStatus: 'dirty',
+        $updatedAt: now,
       });
     } finally {
       statement.finalizeSync();
@@ -588,8 +650,8 @@ export const DatabaseService = {
 
     // Update the debt balance
     db.runSync(
-      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ? WHERE id = ?',
-      [newBalance, today, 'dirty', debtId]
+      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+      [newBalance, today, 'dirty', now, debtId]
     );
 
     // For credit (payment) transactions, also create a main ledger transaction
@@ -597,7 +659,7 @@ export const DatabaseService = {
     if (type === 'credit') {
       const mainTransactionId = generateUUID();
       const mainTransStatement = db.prepareSync(
-        'INSERT INTO transactions (id, description, amount, type, date, category) VALUES ($id, $description, $amount, $type, $date, $category)'
+        'INSERT INTO transactions (id, description, amount, type, date, category, sync_status, updated_at) VALUES ($id, $description, $amount, $type, $date, $category, $syncStatus, $updatedAt)'
       );
       try {
         mainTransStatement.executeSync({
@@ -607,6 +669,8 @@ export const DatabaseService = {
           $type: 'expense', // Payments are expenses from the running balance
           $date: today,
           $category: 'Debt Payment',
+          $syncStatus: 'dirty',
+          $updatedAt: now,
         });
       } finally {
         mainTransStatement.finalizeSync();
@@ -698,10 +762,11 @@ export const DatabaseService = {
     }
 
     // Update the debt's current balance
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
     db.runSync(
-      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ? WHERE id = ?',
-      [balance, today, 'dirty', transaction.debt_id]
+      'UPDATE debts SET balance = ?, last_updated = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+      [balance, today, 'dirty', now, transaction.debt_id]
     );
 
     return true;
@@ -709,9 +774,10 @@ export const DatabaseService = {
 
   // Add debt with initial transaction
   addDebtWithTransaction: (debt: Debt): Debt => {
+    const now = new Date().toISOString();
     // Add the debt first
     const statement = db.prepareSync(
-      'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status, is_recurring, payment_due_day, payment_frequency, minimum_payment, next_payment_date) VALUES ($id, $company, $balance, $lastUpdated, $notes, $syncStatus, $isRecurring, $paymentDueDay, $paymentFrequency, $minimumPayment, $nextPaymentDate)'
+      'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status, is_recurring, payment_due_day, payment_frequency, minimum_payment, next_payment_date, updated_at) VALUES ($id, $company, $balance, $lastUpdated, $notes, $syncStatus, $isRecurring, $paymentDueDay, $paymentFrequency, $minimumPayment, $nextPaymentDate, $updatedAt)'
     );
     try {
       statement.executeSync({
@@ -726,6 +792,7 @@ export const DatabaseService = {
         $paymentFrequency: debt.paymentFrequency || null,
         $minimumPayment: debt.minimumPayment || null,
         $nextPaymentDate: debt.nextPaymentDate || null,
+        $updatedAt: now,
       });
     } finally {
       statement.finalizeSync();
@@ -734,7 +801,7 @@ export const DatabaseService = {
     // Create the initial transaction
     const transactionId = generateUUID();
     const transStatement = db.prepareSync(
-      'INSERT INTO debt_transactions (id, debt_id, type, amount, description, date, balance_after) VALUES ($id, $debtId, $type, $amount, $description, $date, $balanceAfter)'
+      'INSERT INTO debt_transactions (id, debt_id, type, amount, description, date, balance_after, sync_status, updated_at) VALUES ($id, $debtId, $type, $amount, $description, $date, $balanceAfter, $syncStatus, $updatedAt)'
     );
     try {
       transStatement.executeSync({
@@ -745,6 +812,8 @@ export const DatabaseService = {
         $description: 'Initial balance',
         $date: debt.lastUpdated,
         $balanceAfter: debt.balance,
+        $syncStatus: 'dirty',
+        $updatedAt: now,
       });
     } finally {
       transStatement.finalizeSync();
@@ -883,5 +952,231 @@ export const DatabaseService = {
     db.runSync('DELETE FROM bills');
     // Clear settings except for app configuration
     db.runSync("DELETE FROM settings WHERE key NOT IN ('daily_reminder_enabled', 'daily_reminder_id', 'daily_reminder_hour', 'daily_reminder_minute')");
+  },
+
+  // ============ SYNC HELPER METHODS ============
+
+  // Get all bills with dirty sync status
+  getDirtyBills: (): Bill[] => {
+    const result = db.getAllSync(
+      "SELECT * FROM bills WHERE sync_status = 'dirty'"
+    ) as BillRow[];
+
+    return result.map((row) => ({
+      id: row.id,
+      name: row.name,
+      amount: row.amount,
+      dueDay: row.due_day,
+      isPaid: !!row.is_paid,
+      billMonth: row.bill_month,
+      syncStatus: row.sync_status as 'synced' | 'dirty' | 'deleted',
+    }));
+  },
+
+  // Get all transactions with dirty sync status
+  getDirtyTransactions: (): Transaction[] => {
+    const result = db.getAllSync(
+      "SELECT * FROM transactions WHERE sync_status = 'dirty'"
+    ) as TransactionRow[];
+
+    return result.map((row) => ({
+      id: row.id,
+      description: row.description,
+      amount: row.amount,
+      type: row.type as 'income' | 'bill_paid' | 'expense' | 'credit',
+      date: row.date,
+      category: row.category || undefined,
+      relatedBillId: row.related_bill_id || undefined,
+    }));
+  },
+
+  // Get all debts with dirty sync status
+  getDirtyDebts: (): Debt[] => {
+    const result = db.getAllSync(
+      "SELECT * FROM debts WHERE sync_status = 'dirty'"
+    ) as DebtRow[];
+
+    return result.map((row) => ({
+      id: row.id,
+      company: row.company,
+      balance: row.balance,
+      lastUpdated: row.last_updated,
+      notes: row.notes || undefined,
+      syncStatus: row.sync_status as 'synced' | 'dirty' | 'deleted',
+      isRecurring: !!row.is_recurring,
+      paymentDueDay: row.payment_due_day || undefined,
+      paymentFrequency: row.payment_frequency as PaymentFrequency | undefined,
+      minimumPayment: row.minimum_payment || undefined,
+      nextPaymentDate: row.next_payment_date || undefined,
+    }));
+  },
+
+  // Get all debt transactions with dirty sync status
+  getDirtyDebtTransactions: (): DebtTransaction[] => {
+    const result = db.getAllSync(
+      "SELECT * FROM debt_transactions WHERE sync_status = 'dirty'"
+    ) as DebtTransactionRow[];
+
+    return result.map((row) => ({
+      id: row.id,
+      debtId: row.debt_id,
+      type: row.type as 'initial' | 'debit' | 'credit',
+      amount: row.amount,
+      description: row.description,
+      date: row.date,
+      balanceAfter: row.balance_after,
+    }));
+  },
+
+  // Mark bills as synced
+  markBillsSynced: (ids: string[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.runSync(
+      `UPDATE bills SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+      ids
+    );
+  },
+
+  // Mark transactions as synced
+  markTransactionsSynced: (ids: string[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.runSync(
+      `UPDATE transactions SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+      ids
+    );
+  },
+
+  // Mark debts as synced
+  markDebtsSynced: (ids: string[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.runSync(
+      `UPDATE debts SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+      ids
+    );
+  },
+
+  // Mark debt transactions as synced
+  markDebtTransactionsSynced: (ids: string[]) => {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.runSync(
+      `UPDATE debt_transactions SET sync_status = 'synced' WHERE id IN (${placeholders})`,
+      ids
+    );
+  },
+
+  // Get count of pending changes
+  getPendingChangesCount: (): number => {
+    const bills = db.getAllSync(
+      "SELECT COUNT(*) as count FROM bills WHERE sync_status = 'dirty'"
+    ) as { count: number }[];
+    const transactions = db.getAllSync(
+      "SELECT COUNT(*) as count FROM transactions WHERE sync_status = 'dirty'"
+    ) as { count: number }[];
+    const debts = db.getAllSync(
+      "SELECT COUNT(*) as count FROM debts WHERE sync_status = 'dirty'"
+    ) as { count: number }[];
+    const debtTransactions = db.getAllSync(
+      "SELECT COUNT(*) as count FROM debt_transactions WHERE sync_status = 'dirty'"
+    ) as { count: number }[];
+
+    return (
+      (bills[0]?.count || 0) +
+      (transactions[0]?.count || 0) +
+      (debts[0]?.count || 0) +
+      (debtTransactions[0]?.count || 0)
+    );
+  },
+
+  // Upsert bill from cloud
+  upsertBillFromCloud: (bill: Bill & { updatedAt: string }) => {
+    const existingResult = db.getAllSync(
+      'SELECT updated_at FROM bills WHERE id = ?',
+      [bill.id]
+    ) as { updated_at: string }[];
+
+    if (existingResult.length > 0) {
+      // Only update if cloud version is newer
+      if (bill.updatedAt > existingResult[0].updated_at) {
+        db.runSync(
+          'UPDATE bills SET name = ?, amount = ?, due_day = ?, is_paid = ?, bill_month = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+          [bill.name, bill.amount, bill.dueDay, bill.isPaid ? 1 : 0, bill.billMonth, 'synced', bill.updatedAt, bill.id]
+        );
+      }
+    } else {
+      db.runSync(
+        'INSERT INTO bills (id, name, amount, due_day, is_paid, bill_month, sync_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [bill.id, bill.name, bill.amount, bill.dueDay, bill.isPaid ? 1 : 0, bill.billMonth, 'synced', bill.updatedAt]
+      );
+    }
+  },
+
+  // Upsert transaction from cloud
+  upsertTransactionFromCloud: (transaction: Transaction & { updatedAt: string }) => {
+    const existingResult = db.getAllSync(
+      'SELECT updated_at FROM transactions WHERE id = ?',
+      [transaction.id]
+    ) as { updated_at: string }[];
+
+    if (existingResult.length > 0) {
+      if (transaction.updatedAt > existingResult[0].updated_at) {
+        db.runSync(
+          'UPDATE transactions SET description = ?, amount = ?, type = ?, date = ?, category = ?, related_bill_id = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+          [transaction.description, transaction.amount, transaction.type, transaction.date, transaction.category || null, transaction.relatedBillId || null, 'synced', transaction.updatedAt, transaction.id]
+        );
+      }
+    } else {
+      db.runSync(
+        'INSERT INTO transactions (id, description, amount, type, date, category, related_bill_id, sync_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [transaction.id, transaction.description, transaction.amount, transaction.type, transaction.date, transaction.category || null, transaction.relatedBillId || null, 'synced', transaction.updatedAt]
+      );
+    }
+  },
+
+  // Upsert debt from cloud
+  upsertDebtFromCloud: (debt: Debt & { updatedAt: string }) => {
+    const existingResult = db.getAllSync(
+      'SELECT updated_at FROM debts WHERE id = ?',
+      [debt.id]
+    ) as { updated_at: string }[];
+
+    if (existingResult.length > 0) {
+      if (debt.updatedAt > existingResult[0].updated_at) {
+        db.runSync(
+          'UPDATE debts SET company = ?, balance = ?, last_updated = ?, notes = ?, sync_status = ?, is_recurring = ?, payment_due_day = ?, payment_frequency = ?, minimum_payment = ?, next_payment_date = ?, updated_at = ? WHERE id = ?',
+          [debt.company, debt.balance, debt.lastUpdated, debt.notes || null, 'synced', debt.isRecurring ? 1 : 0, debt.paymentDueDay || null, debt.paymentFrequency || null, debt.minimumPayment || null, debt.nextPaymentDate || null, debt.updatedAt, debt.id]
+        );
+      }
+    } else {
+      db.runSync(
+        'INSERT INTO debts (id, company, balance, last_updated, notes, sync_status, is_recurring, payment_due_day, payment_frequency, minimum_payment, next_payment_date, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [debt.id, debt.company, debt.balance, debt.lastUpdated, debt.notes || null, 'synced', debt.isRecurring ? 1 : 0, debt.paymentDueDay || null, debt.paymentFrequency || null, debt.minimumPayment || null, debt.nextPaymentDate || null, debt.updatedAt]
+      );
+    }
+  },
+
+  // Upsert debt transaction from cloud
+  upsertDebtTransactionFromCloud: (debtTransaction: DebtTransaction & { updatedAt: string }) => {
+    const existingResult = db.getAllSync(
+      'SELECT updated_at FROM debt_transactions WHERE id = ?',
+      [debtTransaction.id]
+    ) as { updated_at: string }[];
+
+    if (existingResult.length > 0) {
+      if (debtTransaction.updatedAt > existingResult[0].updated_at) {
+        db.runSync(
+          'UPDATE debt_transactions SET debt_id = ?, type = ?, amount = ?, description = ?, date = ?, balance_after = ?, sync_status = ?, updated_at = ? WHERE id = ?',
+          [debtTransaction.debtId, debtTransaction.type, debtTransaction.amount, debtTransaction.description, debtTransaction.date, debtTransaction.balanceAfter, 'synced', debtTransaction.updatedAt, debtTransaction.id]
+        );
+      }
+    } else {
+      db.runSync(
+        'INSERT INTO debt_transactions (id, debt_id, type, amount, description, date, balance_after, sync_status, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [debtTransaction.id, debtTransaction.debtId, debtTransaction.type, debtTransaction.amount, debtTransaction.description, debtTransaction.date, debtTransaction.balanceAfter, 'synced', debtTransaction.updatedAt]
+      );
+    }
   },
 };

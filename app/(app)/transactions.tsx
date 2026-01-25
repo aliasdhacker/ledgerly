@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { DatabaseService } from '../src/services/DatabaseService';
-import { Transaction } from '../src/types';
+import { DatabaseService } from '../../src/services/DatabaseService';
+import { Transaction } from '../../src/types';
 
 export default function TransactionsScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);

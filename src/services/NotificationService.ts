@@ -61,7 +61,7 @@ export const NotificationService = {
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
-          title: 'Ledgerly Daily Check-in',
+          title: 'Driftmoney Daily Check-in',
           body: unpaidCount > 0
             ? `You have ${unpaidCount} upcoming bill${unpaidCount > 1 ? 's' : ''} totaling $${unpaidTotal.toFixed(2)}`
             : 'All bills are paid! Check your safe to spend.',

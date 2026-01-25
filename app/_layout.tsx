@@ -1,11 +1,18 @@
 import { useEffect } from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { PostHogProvider } from 'posthog-react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AuthProvider, useAuthContext } from '../src/contexts/AuthContext';
+import { SyncProvider } from '../src/contexts/SyncContext';
 import { NotificationService } from '../src/services/NotificationService';
 import { DatabaseService } from '../src/services/DatabaseService';
 
-export default function Layout() {
+function RootLayoutNav() {
+  const { isAuthenticated, isLoading } = useAuthContext();
+  const segments = useSegments();
+  const router = useRouter();
+
   useEffect(() => {
     // Initialize database and request notification permissions on app start
     const initApp = async () => {
@@ -26,91 +33,57 @@ export default function Layout() {
     initApp();
   }, []);
 
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // Redirect to login if not authenticated and not already in auth group
+      router.replace('/(auth)/login');
+    } else if (isAuthenticated && inAuthGroup) {
+      // Redirect to app if authenticated and still in auth group
+      router.replace('/(app)');
+    }
+  }, [isAuthenticated, isLoading, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  return <Slot />;
+}
+
+export default function RootLayout() {
   return (
-    <PostHogProvider
-      apiKey="phc_S53mwouff8agLuQBAisjZZJU4fbjOBkizHVycrbQzxr"
-      options={{
-        host: 'https://us.i.posthog.com',
-        enableSessionReplay: true,
-      }}
-      autocapture
-    >
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: '#007AFF',
-          tabBarInactiveTintColor: '#8E8E93',
-          headerStyle: {
-            backgroundColor: '#F2F2F7',
-          },
-          tabBarStyle: {
-            backgroundColor: '#F2F2F7',
-          },
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <PostHogProvider
+        apiKey="phc_S53mwouff8agLuQBAisjZZJU4fbjOBkizHVycrbQzxr"
+        options={{
+          host: 'https://us.i.posthog.com',
+          enableSessionReplay: true,
         }}
+        autocapture
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Draft',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calculator" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="bills"
-          options={{
-            title: 'Bills',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="list" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="add"
-          options={{
-            title: 'Add Bill',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="add-circle" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="transactions"
-          options={{
-            title: 'Transactions',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="swap-horizontal" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="income"
-          options={{
-            title: 'Income',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="cash" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="debts"
-          options={{
-            title: 'Debts',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="card" size={size} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: 'Settings',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="settings" size={size} color={color} />
-            ),
-          }}
-        />
-      </Tabs>
-    </PostHogProvider>
+        <AuthProvider>
+          <SyncProvider>
+            <RootLayoutNav />
+          </SyncProvider>
+        </AuthProvider>
+      </PostHogProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+  },
+});

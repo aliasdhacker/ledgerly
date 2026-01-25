@@ -1,4 +1,4 @@
-# Ledgerly: Application Design & Master Plan
+# Driftmoney: Application Design & Master Plan
 
 **Version:** 1.0
 **Target Platform:** iOS (Mobile First / Offline First)
@@ -7,7 +7,7 @@
 ---
 
 ## 1. Executive Summary
-**Ledgerly** is a personal finance application designed to answer the question: *"How much money do I actually have right now?"* Unlike traditional budget apps that track historical spending, Ledgerly focuses on **cash flow forecasting** (The "Draft" calculation) and daily bill management.
+**Driftmoney** is a personal finance application designed to answer the question: *"How much money do I actually have right now?"* Unlike traditional budget apps that track historical spending, Driftmoney focuses on **cash flow forecasting** (The "Draft" calculation) and daily bill management.
 
 **Core Philosophy:** "Offline-First." The application functions 100% locally on the device using SQLite. The Cloud (AWS/Spring Boot) serves strictly as a backup and synchronization mechanism, not a runtime dependency.
 
@@ -65,10 +65,10 @@ To ensure the "Offline-to-Cloud" transition is seamless, the local SQLite schema
 ### 4.1. Project Initialization
 ```bash
 # Initialize Expo with TypeScript
-npx create-expo-app@latest ledgerly -t default
+npx create-expo-app@latest driftmoney -t default
 
 # Navigate to project
-cd ledgerly
+cd driftmoney
 
 # Install SQLite and FileSystem
 npx expo install expo-sqlite expo-file-system
@@ -93,7 +93,7 @@ TypeScript
 import * as SQLite from 'expo-sqlite';
 
 // Open the database (creates it if it doesn't exist)
-const db = SQLite.openDatabaseSync('ledgerly.db');
+const db = SQLite.openDatabaseSync('driftmoney.db');
 
 export interface Bill {
   id: string; // UUID

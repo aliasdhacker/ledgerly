@@ -85,3 +85,5 @@ credentials.json
 google-services.json
 GoogleService-Info.plist
 secrets.*
+AUTHENTICATION_SETUP.txt
+ocr-pipeline/.env

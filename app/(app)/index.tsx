@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { DatabaseService } from '../src/services/DatabaseService';
-import { Bill, Debt } from '../src/types';
+import { DatabaseService } from '../../src/services/DatabaseService';
+import { Bill, Debt } from '../../src/types';
 
 export default function DraftScreen() {
   const [runningBalance, setRunningBalance] = useState(0);

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Ollama LLM Service (commented out - using remote machine)
+  # To use local Ollama, uncomment this block and set OLLAMA_URL=http://ollama:11434
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: driftmoney-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+
+  # Surya OCR Service
+  surya-ocr:
+    build:
+      context: ./surya-service
+      dockerfile: Dockerfile
+    container_name: driftmoney-surya
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    # Uncomment for GPU support later:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Pipeline API Service
+  api:
+    build:
+      context: ./api-service
+      dockerfile: Dockerfile
+    container_name: driftmoney-ocr-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+    environment:
+      # Set OLLAMA_URL to your remote machine's IP/hostname
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - SURYA_URL=http://surya-ocr:8001
+      - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+    depends_on:
+      - surya-ocr
+    restart: unless-stopped
+
+# volumes:
+#   ollama_data:  # Uncomment if using local Ollama

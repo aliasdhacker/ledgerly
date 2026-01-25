@@ -1,22 +1,29 @@
 {
   "expo": {
-    "name": "Ledgerly",
-    "slug": "ledgerly",
+    "name": "Driftmoney",
+    "slug": "driftmoney",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "ledgerly",
+    "scheme": "driftmoney",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ledgerly.mobile",
+      "bundleIdentifier": "com.driftmoney.acarr",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.682479545419-5s9t3qjrn6hhbv8rp0bqem5s3ah6oj61"
+            ]
+          }
+        ]
       }
     },
     "android": {
-      "package": "com.ledgerly.mobile",
+      "package": "com.driftmoney.acarr",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -35,7 +42,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
@@ -52,7 +59,9 @@
       ],
       "expo-sqlite",
       "expo-localization",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -61,7 +70,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "dfecb809-9798-4314-8bd5-020a3402ecf3"
+        "projectId": "14a7be30-2093-41f0-ad3a-3652ffa7acb6"
       }
     },
     "owner": "carrdevs"

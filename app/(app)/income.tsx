@@ -13,8 +13,8 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { DatabaseService } from '../src/services/DatabaseService';
-import { Transaction } from '../src/types';
+import { DatabaseService } from '../../src/services/DatabaseService';
+import { Transaction } from '../../src/types';
 
 export default function IncomeScreen() {
   const [incomeAmount, setIncomeAmount] = useState('');

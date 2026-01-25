@@ -44,3 +44,35 @@ export interface DebtTransaction {
   date: string; // ISO date string
   balanceAfter: number; // Balance after this transaction
 }
+
+// Auth types
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  avatarUrl?: string;
+  createdAt: string;
+}
+
+export interface AuthState {
+  user: User | null;
+  session: Session | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+}
+
+export interface Session {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+
+// Sync types
+export type SyncStatus = 'idle' | 'syncing' | 'error' | 'success';
+
+export interface SyncState {
+  status: SyncStatus;
+  lastSyncedAt: string | null;
+  error: string | null;
+  pendingChanges: number;
+}

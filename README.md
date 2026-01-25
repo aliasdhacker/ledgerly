@@ -1,8 +1,8 @@
-# Ledgerly
+# Driftmoney
 
 A personal finance app that answers: *"How much money do I actually have right now?"*
 
-Unlike traditional budget apps that track historical spending, Ledgerly focuses on **cash flow forecasting** and daily bill management.
+Unlike traditional budget apps that track historical spending, Driftmoney focuses on **cash flow forecasting** and daily bill management.
 
 ## Philosophy
 
@@ -37,7 +37,7 @@ Unlike traditional budget apps that track historical spending, Ledgerly focuses 
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd ledgerly
+cd driftmoney
 
 # Install dependencies
 npm install
@@ -89,7 +89,7 @@ npx expo start
 
 ## Roadmap
 
-See [ledgerly application design and master plan.md](ledgerly%20application%20design%20and%20master%20plan.md) for full details.
+See [driftmoney application design and master plan.md](driftmoney%20application%20design%20and%20master%20plan.md) for full details.
 
 - [x] Sprint 1: Foundation (Expo, SQLite, basic screens)
 - [x] Sprint 2: Core Value (Draft calculation, bill tracking)

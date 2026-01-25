@@ -19,8 +19,8 @@ import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { DatabaseService } from '../src/services/DatabaseService';
-import { Debt, DebtTransaction, PaymentFrequency } from '../src/types';
+import { DatabaseService } from '../../src/services/DatabaseService';
+import { Debt, DebtTransaction, PaymentFrequency } from '../../src/types';
 
 export default function DebtsScreen() {
   const [debts, setDebts] = useState<Debt[]>([]);

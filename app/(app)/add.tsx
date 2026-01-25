@@ -13,8 +13,8 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { DatabaseService } from '../src/services/DatabaseService';
-import { Bill } from '../src/types';
+import { DatabaseService } from '../../src/services/DatabaseService';
+import { Bill } from '../../src/types';
 
 export default function AddBillScreen() {
   const router = useRouter();

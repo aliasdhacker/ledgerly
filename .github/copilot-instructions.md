@@ -1,7 +1,7 @@
-# Ledgerly AI Coding Guidelines
+# Driftmoney AI Coding Guidelines
 
 ## Architecture Overview
-Ledgerly is an offline-first personal finance app focusing on cash flow forecasting ("Draft" calculation). Built with React Native (Expo) + TypeScript + SQLite locally. Spring Boot backend on AWS for sync only.
+Driftmoney is an offline-first personal finance app focusing on cash flow forecasting ("Draft" calculation). Built with React Native (Expo) + TypeScript + SQLite locally. Spring Boot backend on AWS for sync only.
 
 - **Offline-first**: App functions 100% locally; cloud is backup/sync.
 - **Hub-and-spoke**: Mobile app (spoke) syncs to AWS (hub).
@@ -35,7 +35,7 @@ interface Bill {
 - Pull: GET `/sync/pull` for server changes since last timestamp.
 
 ## Development Workflow
-- Init: `npx create-expo-app@latest ledgerly -t default`
+- Init: `npx create-expo-app@latest driftmoney -t default`
 - SQLite: `npx expo install expo-sqlite expo-file-system`
 - Structure: `/src/{components,screens,services,utils,types}`
 - State: React Context or Zustand.
@@ -45,5 +45,4 @@ interface Bill {
 - Draft: Filter unpaid bills due between current day and target day.
 - Notifications: Use `expo-notifications` for daily reminders.
 
-Reference: [ledgerly application design and master plan.md](ledgerly application design and master plan.md)</content>
-<parameter name="filePath">f:\Dev\Ledgerly\.github\copilot-instructions.md
+Reference: [driftmoney application design and master plan.md](driftmoney application design and master plan.md)
