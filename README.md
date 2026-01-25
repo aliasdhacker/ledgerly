@@ -4,6 +4,19 @@ A personal finance app that answers: *"How much money do I actually have right n
 
 Unlike traditional budget apps that track historical spending, Driftmoney focuses on **cash flow forecasting** and daily bill management.
 
+# Refactor notes:
+Done. Created REFACTOR_PLAN_v3.md at project root, linked to tag v0.1.0-stable.
+Summary of saved docs:
+FilePurpose
+REFACTOR_PLAN_v3.md
+Complete implementation plan with rollback instructions
+PROJECT_STATUS_2026-01-25.md
+Snapshot of current working state
+OCR_PIPELINE_SESSION.md
+OCR development history
+To rollback if needed:
+git checkout v0.1.0-stable
+
 ## Philosophy
 
 **Offline-First**: The app functions 100% locally using SQLite. Cloud sync (planned) serves only as backup, not a runtime dependency.
