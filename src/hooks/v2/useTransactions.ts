@@ -22,9 +22,9 @@ interface UseTransactionsReturn extends UseTransactionsState {
   refresh: () => void;
   getById: (id: string) => Transaction | null;
   getWithRelations: (id: string) => TransactionWithRelations | null;
-  create: (data: TransactionCreate) => { success: boolean; transaction?: Transaction; errors?: string[] };
-  update: (id: string, data: TransactionUpdate) => { success: boolean; transaction?: Transaction; errors?: string[] };
-  remove: (id: string) => boolean;
+  create: (data: TransactionCreate) => { success: boolean; data?: Transaction; errors?: string[] };
+  update: (id: string, data: TransactionUpdate) => { success: boolean; data?: Transaction; errors?: string[] };
+  remove: (id: string) => { success: boolean; errors?: string[] };
   markReconciled: (id: string) => Transaction | null;
 }
 
@@ -120,8 +120,15 @@ export function useRecentTransactions(limit = 20): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setTransactions(TransactionService.getRecent(limit));
-    setLoading(false);
+    let cancelled = false;
+    const data = TransactionService.getRecent(limit);
+    if (!cancelled) {
+      setTransactions(data);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [limit]);
 
   return { transactions, loading };
@@ -137,13 +144,22 @@ export function useAccountTransactions(accountId: string, limit?: number): {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {
-    setTransactions(TransactionService.getByAccount(accountId, limit));
+    const data = TransactionService.getByAccount(accountId, limit);
+    setTransactions(data);
     setLoading(false);
   }, [accountId, limit]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    const data = TransactionService.getByAccount(accountId, limit);
+    if (!cancelled) {
+      setTransactions(data);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, limit]);
 
   return { transactions, loading, refresh };
 }

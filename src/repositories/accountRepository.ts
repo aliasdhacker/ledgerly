@@ -110,6 +110,40 @@ export const AccountRepository = {
     return this.update(id, { balance: newBalance });
   },
 
+  // Atomically adjust balance using SQL - prevents race conditions
+  // Returns true if the update succeeded, false if account not found
+  atomicAdjustBalance(id: string, delta: number): boolean {
+    const timestamp = now();
+    const result = execute(
+      `UPDATE accounts SET
+         balance = balance + ?,
+         sync_status = 'dirty',
+         updated_at = ?
+       WHERE id = ? AND sync_status != 'deleted'`,
+      [delta, timestamp, id]
+    );
+    return result.changes > 0;
+  },
+
+  // Atomically adjust balance with optimistic locking (version check)
+  // Returns true if successful, false if account changed since version was read
+  atomicAdjustBalanceWithVersion(
+    id: string,
+    delta: number,
+    expectedUpdatedAt: string
+  ): boolean {
+    const timestamp = now();
+    const result = execute(
+      `UPDATE accounts SET
+         balance = balance + ?,
+         sync_status = 'dirty',
+         updated_at = ?
+       WHERE id = ? AND updated_at = ? AND sync_status != 'deleted'`,
+      [delta, timestamp, id, expectedUpdatedAt]
+    );
+    return result.changes > 0;
+  },
+
   delete(id: string): void {
     softDelete('accounts', id);
   },

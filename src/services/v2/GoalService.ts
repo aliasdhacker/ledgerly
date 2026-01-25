@@ -4,6 +4,8 @@
 import { GoalRepository, AccountRepository } from '../../repositories';
 import { validateGoalCreate, validateGoalUpdate } from '../../validation';
 import type { Goal, GoalCreate, GoalUpdate, GoalProgress } from '../../types/goal';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface GoalSummary {
   activeGoalsCount: number;
@@ -35,43 +37,45 @@ export const GoalService = {
     return GoalRepository.findByAccount(accountId);
   },
 
-  create(data: GoalCreate): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  create(data: GoalCreate): ServiceResult<Goal> {
     const validation = validateGoalCreate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     // Verify linked account if provided
     if (data.linkedAccountId) {
       const account = AccountRepository.findById(data.linkedAccountId);
       if (!account) {
-        return { success: false, errors: ['Linked account not found'] };
+        return failure(['Linked account not found']);
       }
     }
 
     const goal = GoalRepository.create(data);
-    return { success: true, goal };
+    return success(goal);
   },
 
-  update(id: string, data: GoalUpdate): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  update(id: string, data: GoalUpdate): ServiceResult<Goal> {
     const validation = validateGoalUpdate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const goal = GoalRepository.update(id, data);
     if (!goal) {
-      return { success: false, errors: ['Goal not found'] };
+      return failure(['Goal not found']);
     }
 
-    return { success: true, goal };
+    return success(goal);
   },
 
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const goal = GoalRepository.findById(id);
-    if (!goal) return false;
+    if (!goal) {
+      return failure(['Goal not found']);
+    }
     GoalRepository.delete(id);
-    return true;
+    return success(undefined);
   },
 
   // Amount Management
@@ -79,58 +83,58 @@ export const GoalService = {
   /**
    * Updates the current saved amount
    */
-  updateAmount(id: string, amount: number): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  updateAmount(id: string, amount: number): ServiceResult<Goal> {
     if (amount < 0) {
-      return { success: false, errors: ['Amount cannot be negative'] };
+      return failure(['Amount cannot be negative']);
     }
 
     const goal = GoalRepository.updateAmount(id, amount);
     if (!goal) {
-      return { success: false, errors: ['Goal not found'] };
+      return failure(['Goal not found']);
     }
 
-    return { success: true, goal };
+    return success(goal);
   },
 
   /**
    * Adds to the current saved amount
    */
-  addAmount(id: string, addition: number): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  addAmount(id: string, addition: number): ServiceResult<Goal> {
     if (addition <= 0) {
-      return { success: false, errors: ['Addition must be positive'] };
+      return failure(['Addition must be positive']);
     }
 
     const goal = GoalRepository.addToAmount(id, addition);
     if (!goal) {
-      return { success: false, errors: ['Goal not found'] };
+      return failure(['Goal not found']);
     }
 
-    return { success: true, goal };
+    return success(goal);
   },
 
   /**
    * Subtracts from the current saved amount (withdrawal)
    */
-  withdrawAmount(id: string, withdrawal: number): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  withdrawAmount(id: string, withdrawal: number): ServiceResult<Goal> {
     if (withdrawal <= 0) {
-      return { success: false, errors: ['Withdrawal must be positive'] };
+      return failure(['Withdrawal must be positive']);
     }
 
     const existing = GoalRepository.findById(id);
     if (!existing) {
-      return { success: false, errors: ['Goal not found'] };
+      return failure(['Goal not found']);
     }
 
     if (withdrawal > existing.currentAmount) {
-      return { success: false, errors: ['Withdrawal exceeds current savings'] };
+      return failure(['Withdrawal exceeds current savings']);
     }
 
     const goal = GoalRepository.addToAmount(id, -withdrawal);
     if (!goal) {
-      return { success: false, errors: ['Failed to update goal'] };
+      return failure(['Failed to update goal']);
     }
 
-    return { success: true, goal };
+    return success(goal);
   },
 
   /**
@@ -262,28 +266,28 @@ export const GoalService = {
    * Syncs goal amount with linked account balance
    * Useful when goal is tied to a dedicated savings account
    */
-  syncWithLinkedAccount(goalId: string): { success: true; goal: Goal } | { success: false; errors: string[] } {
+  syncWithLinkedAccount(goalId: string): ServiceResult<Goal> {
     const goal = GoalRepository.findById(goalId);
     if (!goal) {
-      return { success: false, errors: ['Goal not found'] };
+      return failure(['Goal not found']);
     }
 
     if (!goal.linkedAccountId) {
-      return { success: false, errors: ['Goal has no linked account'] };
+      return failure(['Goal has no linked account']);
     }
 
     const account = AccountRepository.findById(goal.linkedAccountId);
     if (!account) {
-      return { success: false, errors: ['Linked account not found'] };
+      return failure(['Linked account not found']);
     }
 
     // Update goal amount to match account balance
     const updatedGoal = GoalRepository.updateAmount(goalId, account.balance);
     if (!updatedGoal) {
-      return { success: false, errors: ['Failed to sync goal'] };
+      return failure(['Failed to sync goal']);
     }
 
-    return { success: true, goal: updatedGoal };
+    return success(updatedGoal);
   },
 
   // Helpers

@@ -85,8 +85,15 @@ export function useSafeToSpend(targetDate?: string): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setSafeToSpend(DraftService.getSafeToSpend(targetDate));
-    setLoading(false);
+    let cancelled = false;
+    const value = DraftService.getSafeToSpend(targetDate);
+    if (!cancelled) {
+      setSafeToSpend(value);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [targetDate]);
 
   return { safeToSpend, loading };
@@ -111,14 +118,21 @@ export function useFinancialOverview(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setData({
+    let cancelled = false;
+    const overview = {
       availableBalance: DraftService.getAvailableBalance(),
       creditDebt: DraftService.getCreditDebt(),
       netWorth: DraftService.getNetWorth(),
       upcomingPayables: DraftService.getUpcomingTotal(30),
       overduePayables: DraftService.getOverdueTotal(),
-    });
-    setLoading(false);
+    };
+    if (!cancelled) {
+      setData(overview);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { ...data, loading };
@@ -139,9 +153,15 @@ export function useUntilPayday(payday: number): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const result = DraftService.calculateUntilPayday(payday);
-    setData(result);
-    setLoading(false);
+    if (!cancelled) {
+      setData(result);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [payday]);
 
   return { ...data, loading };

@@ -7,17 +7,21 @@ export {
   rowToEntity,
   entityToRow,
   now,
+  safeJsonParse,
   buildInsert,
   buildUpdate,
   queryAll,
   queryOne,
   execute,
+  withTransaction,
   softDelete,
   hardDelete,
   findBySyncStatus,
   markSynced,
   getSetting,
   setSetting,
+  deleteAllData,
 } from './helpers';
+export type { ExecuteResult } from './helpers';
 export { initializeDatabase, runMigrations, getCurrentVersion } from './migrations';
 export { migrateLegacyData, hasLegacyData } from './migrateLegacy';

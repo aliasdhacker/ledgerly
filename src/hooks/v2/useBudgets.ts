@@ -19,9 +19,9 @@ interface UseBudgetsReturn extends UseBudgetsState {
   getById: (id: string) => Budget | null;
   getProgress: (id: string) => BudgetProgress | null;
   getAlerts: () => BudgetProgress[];
-  create: (data: BudgetCreate) => { success: boolean; budget?: Budget; errors?: string[] };
-  update: (id: string, data: BudgetUpdate) => { success: boolean; budget?: Budget; errors?: string[] };
-  remove: (id: string) => boolean;
+  create: (data: BudgetCreate) => { success: boolean; data?: Budget; errors?: string[] };
+  update: (id: string, data: BudgetUpdate) => { success: boolean; data?: Budget; errors?: string[] };
+  remove: (id: string) => { success: boolean; errors?: string[] };
 }
 
 export function useBudgets(): UseBudgetsReturn {
@@ -112,9 +112,17 @@ export function useBudgetProgress(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setProgress(BudgetService.getAllProgress());
-    setAlerts(BudgetService.getAlerts());
-    setLoading(false);
+    let cancelled = false;
+    const progressData = BudgetService.getAllProgress();
+    const alertsData = BudgetService.getAlerts();
+    if (!cancelled) {
+      setProgress(progressData);
+      setAlerts(alertsData);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { progress, alerts, loading };

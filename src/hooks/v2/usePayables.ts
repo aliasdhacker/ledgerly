@@ -14,22 +14,22 @@ interface UsePayablesState {
   error: string | null;
 }
 
+interface MarkPaidResult {
+  payable: Payable;
+  transaction: Transaction;
+  nextPayable?: Payable;
+}
+
 interface UsePayablesReturn extends UsePayablesState {
   refresh: () => void;
   getById: (id: string) => PayableWithStatus | null;
   getUpcoming: (days?: number) => PayableWithStatus[];
   getOverdue: () => PayableWithStatus[];
-  create: (data: PayableCreate) => { success: boolean; payable?: Payable; errors?: string[] };
-  update: (id: string, data: PayableUpdate) => { success: boolean; payable?: Payable; errors?: string[] };
-  remove: (id: string) => boolean;
-  markPaid: (payment: PayablePayment) => {
-    success: boolean;
-    payable?: Payable;
-    transaction?: Transaction;
-    nextPayable?: Payable;
-    errors?: string[]
-  };
-  markUnpaid: (id: string) => { success: boolean; payable?: Payable; errors?: string[] };
+  create: (data: PayableCreate) => { success: boolean; data?: Payable; errors?: string[] };
+  update: (id: string, data: PayableUpdate) => { success: boolean; data?: Payable; errors?: string[] };
+  remove: (id: string) => { success: boolean; errors?: string[] };
+  markPaid: (payment: PayablePayment) => { success: boolean; data?: MarkPaidResult; errors?: string[] };
+  markUnpaid: (id: string) => { success: boolean; data?: Payable; errors?: string[] };
 }
 
 export function usePayables(options: { isPaid?: boolean; categoryId?: string } = {}): UsePayablesReturn {
@@ -135,13 +135,22 @@ export function useUnpaidPayables(): {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(() => {
-    setPayables(PayableService.getUnpaid());
+    const data = PayableService.getUnpaid();
+    setPayables(data);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    const data = PayableService.getUnpaid();
+    if (!cancelled) {
+      setPayables(data);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return { payables, loading, refresh };
 }
@@ -156,9 +165,15 @@ export function useUpcomingPayables(days = 30): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const upcoming = PayableService.getUpcoming(days);
-    setPayables(upcoming);
-    setLoading(false);
+    if (!cancelled) {
+      setPayables(upcoming);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [days]);
 
   const total = payables.reduce((sum, p) => sum + p.amount, 0);

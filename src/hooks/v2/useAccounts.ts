@@ -19,9 +19,9 @@ interface UseAccountsReturn extends UseAccountsState {
   getBankAccounts: () => AccountWithComputed[];
   getCreditAccounts: () => AccountWithComputed[];
   getCreditAccountsInfo: () => CreditAccountInfo[];
-  create: (data: AccountCreate) => { success: boolean; account?: Account; errors?: string[] };
-  update: (id: string, data: AccountUpdate) => { success: boolean; account?: Account; errors?: string[] };
-  remove: (id: string) => boolean;
+  create: (data: AccountCreate) => { success: boolean; data?: Account; errors?: string[] };
+  update: (id: string, data: AccountUpdate) => { success: boolean; data?: Account; errors?: string[] };
+  remove: (id: string) => { success: boolean; errors?: string[] };
   adjustBalance: (id: string, adjustment: number) => Account | null;
 }
 
@@ -119,7 +119,14 @@ export function useAccountSummary(): AccountSummary | null {
   const [summary, setSummary] = useState<AccountSummary | null>(null);
 
   useEffect(() => {
-    setSummary(AccountService.getSummary());
+    let cancelled = false;
+    const data = AccountService.getSummary();
+    if (!cancelled) {
+      setSummary(data);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return summary;

@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { SyncService } from '../services/SyncService';
-import { SyncState, SyncStatus } from '../types';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { SyncService } from '../services/v2/SyncService';
+import { SyncState, SyncOperationStatus } from '../types';
 import { useAuthContext } from './AuthContext';
 import { AppState, AppStateStatus } from 'react-native';
 
@@ -10,12 +10,25 @@ interface SyncContextType extends SyncState {
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
+// Debounce delay for AppState sync triggers (ms)
+const APP_STATE_SYNC_DEBOUNCE = 1000;
+
 export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuthContext();
-  const [status, setStatus] = useState<SyncStatus>('idle');
+  const [status, setStatus] = useState<SyncOperationStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<number>(0);
+
+  // Refs to prevent circular dependencies and concurrent syncs
+  const isSyncInProgressRef = useRef(false);
+  const isAuthenticatedRef = useRef(isAuthenticated);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep auth ref in sync
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   // Update pending changes count
   const updatePendingChanges = useCallback(() => {
@@ -23,16 +36,27 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPendingChanges(count);
   }, []);
 
-  // Sync function
+  // Sync function - uses ref to check auth to avoid dependency cycle
   const sync = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    if (!isAuthenticated) {
+    // Use ref to check authentication to avoid circular dependency
+    if (!isAuthenticatedRef.current) {
       return { success: false, error: 'Not authenticated' };
     }
 
-    const result = await SyncService.sync();
-    updatePendingChanges();
-    return result;
-  }, [isAuthenticated, updatePendingChanges]);
+    // Prevent concurrent syncs
+    if (isSyncInProgressRef.current) {
+      return { success: false, error: 'Sync already in progress' };
+    }
+
+    isSyncInProgressRef.current = true;
+    try {
+      const result = await SyncService.sync();
+      updatePendingChanges();
+      return result;
+    } finally {
+      isSyncInProgressRef.current = false;
+    }
+  }, [updatePendingChanges]);
 
   // Initialize and subscribe to sync status changes
   useEffect(() => {
@@ -57,11 +81,18 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [updatePendingChanges]);
 
-  // Sync when app comes to foreground
+  // Sync when app comes to foreground (with debounce)
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'active' && isAuthenticated) {
-        sync();
+      if (nextAppState === 'active' && isAuthenticatedRef.current) {
+        // Clear any existing debounce timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        // Debounce to prevent rapid sync calls from quick foreground/background transitions
+        debounceTimerRef.current = setTimeout(() => {
+          sync();
+        }, APP_STATE_SYNC_DEBOUNCE);
       }
     };
 
@@ -69,8 +100,11 @@ export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       subscription.remove();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-  }, [isAuthenticated, sync]);
+  }, [sync]);
 
   // Sync when user becomes authenticated
   useEffect(() => {

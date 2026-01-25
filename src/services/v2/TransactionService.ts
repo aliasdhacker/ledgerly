@@ -2,6 +2,7 @@
 // Business logic layer for transaction operations with automatic balance sync
 
 import { TransactionRepository, AccountRepository } from '../../repositories';
+import { withTransaction } from '../../db';
 import { validateTransactionCreate, validateTransactionUpdate } from '../../validation';
 import type {
   Transaction,
@@ -11,6 +12,8 @@ import type {
   TransactionWithRelations,
 } from '../../types/transaction';
 import { TransactionType } from '../../types/common';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface TransactionSummary {
   totalCredits: number;
@@ -76,100 +79,134 @@ export const TransactionService = {
   },
 
   /**
-   * Creates a transaction and updates the account balance
+   * Creates a transaction and updates the account balance atomically
    * DEBIT decreases bank balance / increases credit balance
    * CREDIT increases bank balance / decreases credit balance
    */
-  create(
-    data: TransactionCreate
-  ): { success: true; transaction: Transaction } | { success: false; errors: string[] } {
+  create(data: TransactionCreate): ServiceResult<Transaction> {
     const validation = validateTransactionCreate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
-    // Verify account exists
+    // Verify account exists (before transaction)
     const account = AccountRepository.findById(data.accountId);
     if (!account) {
-      return { success: false, errors: ['Account not found'] };
+      return failure(['Account not found']);
     }
 
-    // Create the transaction
-    const transaction = TransactionRepository.create(data);
+    // Check for insufficient funds on bank account debits
+    if (account.type === 'bank' && data.type === TransactionType.DEBIT && account.balance < data.amount) {
+      return failure(['Insufficient funds']);
+    }
 
-    // Update account balance
-    const balanceChange = this.calculateBalanceChange(data.type, data.amount, account.type);
-    AccountRepository.updateBalance(data.accountId, account.balance + balanceChange);
+    try {
+      const transaction = withTransaction(() => {
+        // Create the transaction
+        const txn = TransactionRepository.create(data);
 
-    return { success: true, transaction };
+        // Update account balance atomically
+        const balanceChange = this.calculateBalanceChange(data.type, data.amount, account.type);
+        const balanceSuccess = AccountRepository.atomicAdjustBalance(data.accountId, balanceChange);
+        if (!balanceSuccess) {
+          throw new Error('Failed to update account balance');
+        }
+
+        return txn;
+      });
+
+      return success(transaction);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to create transaction']);
+    }
   },
 
   /**
-   * Updates a transaction and adjusts account balance if amount/type changed
+   * Updates a transaction and adjusts account balance atomically if amount/type changed
    */
-  update(
-    id: string,
-    data: TransactionUpdate
-  ): { success: true; transaction: Transaction } | { success: false; errors: string[] } {
+  update(id: string, data: TransactionUpdate): ServiceResult<Transaction> {
     const validation = validateTransactionUpdate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const existing = TransactionRepository.findById(id);
     if (!existing) {
-      return { success: false, errors: ['Transaction not found'] };
+      return failure(['Transaction not found']);
     }
 
     const account = AccountRepository.findById(existing.accountId);
     if (!account) {
-      return { success: false, errors: ['Account not found'] };
+      return failure(['Account not found']);
     }
 
-    // Calculate balance adjustment if amount or type changed
-    const newType = data.type ?? existing.type;
-    const newAmount = data.amount ?? existing.amount;
+    try {
+      const transaction = withTransaction(() => {
+        // Calculate balance adjustment if amount or type changed
+        const newType = data.type ?? existing.type;
+        const newAmount = data.amount ?? existing.amount;
 
-    if (data.type !== undefined || data.amount !== undefined) {
-      // Reverse the old transaction effect
-      const oldBalanceChange = this.calculateBalanceChange(existing.type, existing.amount, account.type);
-      // Apply the new transaction effect
-      const newBalanceChange = this.calculateBalanceChange(newType, newAmount, account.type);
-      const netChange = newBalanceChange - oldBalanceChange;
+        if (data.type !== undefined || data.amount !== undefined) {
+          // Reverse the old transaction effect
+          const oldBalanceChange = this.calculateBalanceChange(existing.type, existing.amount, account.type);
+          // Apply the new transaction effect
+          const newBalanceChange = this.calculateBalanceChange(newType, newAmount, account.type);
+          const netChange = newBalanceChange - oldBalanceChange;
 
-      if (netChange !== 0) {
-        AccountRepository.updateBalance(existing.accountId, account.balance + netChange);
-      }
+          if (netChange !== 0) {
+            const balanceSuccess = AccountRepository.atomicAdjustBalance(existing.accountId, netChange);
+            if (!balanceSuccess) {
+              throw new Error('Failed to update account balance');
+            }
+          }
+        }
+
+        const txn = TransactionRepository.update(id, data);
+        if (!txn) {
+          throw new Error('Failed to update transaction');
+        }
+
+        return txn;
+      });
+
+      return success(transaction);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to update transaction']);
     }
-
-    const transaction = TransactionRepository.update(id, data);
-    if (!transaction) {
-      return { success: false, errors: ['Failed to update transaction'] };
-    }
-
-    return { success: true, transaction };
   },
 
   /**
-   * Deletes a transaction and reverses the account balance change
+   * Deletes a transaction and reverses the account balance change atomically
    */
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const transaction = TransactionRepository.findById(id);
-    if (!transaction) return false;
-
-    const account = AccountRepository.findById(transaction.accountId);
-    if (account) {
-      // Reverse the transaction effect
-      const balanceChange = this.calculateBalanceChange(
-        transaction.type,
-        transaction.amount,
-        account.type
-      );
-      AccountRepository.updateBalance(transaction.accountId, account.balance - balanceChange);
+    if (!transaction) {
+      return failure(['Transaction not found']);
     }
 
-    TransactionRepository.delete(id);
-    return true;
+    const account = AccountRepository.findById(transaction.accountId);
+
+    try {
+      withTransaction(() => {
+        if (account) {
+          // Reverse the transaction effect (negate the original change)
+          const balanceChange = this.calculateBalanceChange(
+            transaction.type,
+            transaction.amount,
+            account.type
+          );
+          const balanceSuccess = AccountRepository.atomicAdjustBalance(transaction.accountId, -balanceChange);
+          if (!balanceSuccess) {
+            throw new Error('Failed to reverse account balance');
+          }
+        }
+
+        TransactionRepository.delete(id);
+      });
+      return success(undefined);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to delete transaction']);
+    }
   },
 
   // Split Operations

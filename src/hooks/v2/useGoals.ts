@@ -19,11 +19,11 @@ interface UseGoalsReturn extends UseGoalsState {
   getById: (id: string) => Goal | null;
   getProgress: (id: string) => GoalProgress | null;
   getBehindSchedule: () => GoalProgress[];
-  create: (data: GoalCreate) => { success: boolean; goal?: Goal; errors?: string[] };
-  update: (id: string, data: GoalUpdate) => { success: boolean; goal?: Goal; errors?: string[] };
-  remove: (id: string) => boolean;
-  addAmount: (id: string, amount: number) => { success: boolean; goal?: Goal; errors?: string[] };
-  withdrawAmount: (id: string, amount: number) => { success: boolean; goal?: Goal; errors?: string[] };
+  create: (data: GoalCreate) => { success: boolean; data?: Goal; errors?: string[] };
+  update: (id: string, data: GoalUpdate) => { success: boolean; data?: Goal; errors?: string[] };
+  remove: (id: string) => { success: boolean; errors?: string[] };
+  addAmount: (id: string, amount: number) => { success: boolean; data?: Goal; errors?: string[] };
+  withdrawAmount: (id: string, amount: number) => { success: boolean; data?: Goal; errors?: string[] };
 }
 
 export function useGoals(options: { activeOnly?: boolean } = { activeOnly: true }): UseGoalsReturn {
@@ -134,10 +134,19 @@ export function useGoalProgress(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setProgress(GoalService.getAllProgress());
-    setBehindSchedule(GoalService.getBehindSchedule());
-    setSummary(GoalService.getSummary());
-    setLoading(false);
+    let cancelled = false;
+    const progressData = GoalService.getAllProgress();
+    const behindData = GoalService.getBehindSchedule();
+    const summaryData = GoalService.getSummary();
+    if (!cancelled) {
+      setProgress(progressData);
+      setBehindSchedule(behindData);
+      setSummary(summaryData);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { progress, behindSchedule, summary, loading };

@@ -4,6 +4,8 @@
 import { AccountRepository } from '../../repositories';
 import { validateAccountCreate, validateAccountUpdate } from '../../validation';
 import type { Account, AccountCreate, AccountUpdate, AccountWithComputed, AccountType } from '../../types/account';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface AccountSummary {
   totalBankBalance: number;
@@ -44,35 +46,37 @@ export const AccountService = {
     return this.getAll({ type: 'credit', activeOnly });
   },
 
-  create(data: AccountCreate): { success: true; account: Account } | { success: false; errors: string[] } {
+  create(data: AccountCreate): ServiceResult<Account> {
     const validation = validateAccountCreate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const account = AccountRepository.create(data);
-    return { success: true, account };
+    return success(account);
   },
 
-  update(id: string, data: AccountUpdate): { success: true; account: Account } | { success: false; errors: string[] } {
+  update(id: string, data: AccountUpdate): ServiceResult<Account> {
     const validation = validateAccountUpdate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const account = AccountRepository.update(id, data);
     if (!account) {
-      return { success: false, errors: ['Account not found'] };
+      return failure(['Account not found']);
     }
 
-    return { success: true, account };
+    return success(account);
   },
 
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const account = AccountRepository.findById(id);
-    if (!account) return false;
+    if (!account) {
+      return failure(['Account not found']);
+    }
     AccountRepository.delete(id);
-    return true;
+    return success(undefined);
   },
 
   // Balance Operations

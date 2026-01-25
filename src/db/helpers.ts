@@ -53,6 +53,34 @@ export function now(): string {
   return new Date().toISOString();
 }
 
+// Safely parse JSON with optional validation
+// Returns defaultValue on parse error or validation failure
+// Validator should match the project's ValidationResult interface (success: boolean, errors: Record<string, string>)
+export function safeJsonParse<T>(
+  json: string | null | undefined,
+  defaultValue: T,
+  validator?: (data: unknown) => { success: boolean; errors?: Record<string, string> }
+): T {
+  if (!json) return defaultValue;
+
+  try {
+    const parsed = JSON.parse(json);
+
+    if (validator) {
+      const result = validator(parsed);
+      if (!result.success) {
+        console.warn('JSON validation failed:', result.errors);
+        return defaultValue;
+      }
+    }
+
+    return parsed as T;
+  } catch (error) {
+    console.warn('JSON parse failed:', error);
+    return defaultValue;
+  }
+}
+
 // Build INSERT statement dynamically
 export function buildInsert(
   table: string,
@@ -83,6 +111,12 @@ export function buildUpdate(
 // SQLite bind value type
 type SQLiteBindValue = string | number | null | boolean | Uint8Array;
 
+// Result from execute() with affected row count and last insert ID
+export interface ExecuteResult {
+  changes: number;
+  lastInsertRowId: number;
+}
+
 // Execute a query and return all rows converted to entities
 export function queryAll<T>(sql: string, params: SQLiteBindValue[] = []): T[] {
   const db = getDb();
@@ -97,10 +131,28 @@ export function queryOne<T>(sql: string, params: SQLiteBindValue[] = []): T | nu
   return row ? rowToEntity<T>(row) : null;
 }
 
-// Execute a statement (INSERT, UPDATE, DELETE)
-export function execute(sql: string, params: SQLiteBindValue[] = []): void {
+// Execute a statement (INSERT, UPDATE, DELETE) and return result info
+export function execute(sql: string, params: SQLiteBindValue[] = []): ExecuteResult {
   const db = getDb();
-  db.runSync(sql, params);
+  const result = db.runSync(sql, params);
+  return {
+    changes: result.changes,
+    lastInsertRowId: result.lastInsertRowId,
+  };
+}
+
+// Execute operations within a transaction - rolls back on error
+export function withTransaction<T>(fn: () => T): T {
+  const db = getDb();
+  db.runSync('BEGIN TRANSACTION');
+  try {
+    const result = fn();
+    db.runSync('COMMIT');
+    return result;
+  } catch (error) {
+    db.runSync('ROLLBACK');
+    throw error;
+  }
 }
 
 // Soft delete - marks record as deleted instead of removing
@@ -148,4 +200,21 @@ export function setSetting(key: string, value: string): void {
     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
     [key, value]
   );
+}
+
+// Delete all user data (keeps schema intact)
+export function deleteAllData(): void {
+  const db = getDb();
+  db.execSync(`
+    DELETE FROM transaction_splits;
+    DELETE FROM transfers;
+    DELETE FROM transactions;
+    DELETE FROM payables;
+    DELETE FROM budgets;
+    DELETE FROM goals;
+    DELETE FROM import_batches;
+    DELETE FROM categories;
+    DELETE FROM accounts;
+    DELETE FROM settings WHERE key != 'db_version';
+  `);
 }

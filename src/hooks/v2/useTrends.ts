@@ -186,12 +186,18 @@ export function useThisMonthSpending(): {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const categories = TrendService.getThisMonthByCategory();
     const totalSpending = TrendService.getThisMonthSpending();
     const totalIncome = TrendService.getThisMonthIncome();
 
-    setData({ categories, totalSpending, totalIncome });
-    setLoading(false);
+    if (!cancelled) {
+      setData({ categories, totalSpending, totalIncome });
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return { ...data, loading };
@@ -206,8 +212,15 @@ export function useTopCategories(startDate: string, endDate: string, limit = 5):
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setCategories(TrendService.getTopCategories(startDate, endDate, limit));
-    setLoading(false);
+    let cancelled = false;
+    const data = TrendService.getTopCategories(startDate, endDate, limit);
+    if (!cancelled) {
+      setCategories(data);
+      setLoading(false);
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [startDate, endDate, limit]);
 
   return { categories, loading };

@@ -10,8 +10,10 @@ import {
   markSynced,
   findBySyncStatus,
   now,
+  safeJsonParse,
 } from '../db';
 import { generateId } from '../utils/idUtils';
+import { validateRecurrenceRule } from '../validation/payableSchema';
 import type { Payable, PayableCreate, PayableUpdate } from '../types/payable';
 import type { RecurrenceRule, SyncStatus } from '../types/common';
 
@@ -32,9 +34,11 @@ function rowToPayable(row: PayableRow): Payable {
   const { recurrenceRuleJson, ...rest } = row;
   return {
     ...rest,
-    recurrenceRule: recurrenceRuleJson
-      ? (JSON.parse(recurrenceRuleJson) as RecurrenceRule)
-      : undefined,
+    recurrenceRule: safeJsonParse<RecurrenceRule | undefined>(
+      recurrenceRuleJson,
+      undefined,
+      validateRecurrenceRule
+    ),
   };
 }
 
@@ -233,14 +237,35 @@ export const PayableRepository = {
     }
   },
 
-  // Analytics helpers
+  // Analytics helpers - use SQL aggregation to avoid N+1
   getUpcomingTotal(days: number): number {
-    const upcoming = this.findUpcoming(days);
-    return upcoming.reduce((sum, p) => sum + p.amount, 0);
+    const today = new Date().toISOString().split('T')[0];
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + days);
+    const futureDateStr = futureDate.toISOString().split('T')[0];
+
+    const result = queryOne<{ total: number }>(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM payables
+       WHERE sync_status != 'deleted'
+         AND is_paid = 0
+         AND due_date >= ?
+         AND due_date <= ?`,
+      [today, futureDateStr]
+    );
+    return result?.total ?? 0;
   },
 
   getOverdueTotal(): number {
-    const overdue = this.findOverdue();
-    return overdue.reduce((sum, p) => sum + p.amount, 0);
+    const today = new Date().toISOString().split('T')[0];
+    const result = queryOne<{ total: number }>(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM payables
+       WHERE sync_status != 'deleted'
+         AND is_paid = 0
+         AND due_date < ?`,
+      [today]
+    );
+    return result?.total ?? 0;
   },
 };

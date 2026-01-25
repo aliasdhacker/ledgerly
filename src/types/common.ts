@@ -1,5 +1,14 @@
 // Common types and base interfaces for DriftMoney
 
+// Standardized result type for service operations
+export type ServiceResult<T> =
+  | { success: true; data: T }
+  | { success: false; errors: string[] };
+
+// Helper to create success/failure results
+export const success = <T>(data: T): ServiceResult<T> => ({ success: true, data });
+export const failure = (errors: string[]): ServiceResult<never> => ({ success: false, errors });
+
 export type SyncStatus = 'synced' | 'dirty' | 'deleted';
 
 export interface SyncableEntity {

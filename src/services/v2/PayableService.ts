@@ -2,11 +2,13 @@
 // Business logic for bills (recurring and one-off) with recurrence generation
 
 import { PayableRepository, TransactionRepository, AccountRepository } from '../../repositories';
+import { withTransaction } from '../../db';
 import { validatePayableCreate, validatePayableUpdate } from '../../validation';
-import { TransactionService } from './TransactionService';
 import type { Payable, PayableCreate, PayableUpdate, PayablePayment, PayableWithStatus } from '../../types/payable';
 import type { Transaction } from '../../types/transaction';
 import { TransactionType, RecurrenceFrequency } from '../../types/common';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface PayableSummary {
   upcomingCount: number;
@@ -15,6 +17,12 @@ export interface PayableSummary {
   overdueTotal: number;
   paidThisMonthCount: number;
   paidThisMonthTotal: number;
+}
+
+export interface MarkPaidResult {
+  payable: Payable;
+  transaction: Transaction;
+  nextPayable?: Payable;
 }
 
 export const PayableService = {
@@ -45,126 +53,162 @@ export const PayableService = {
     return payables.map((p) => this.addStatusFields(p));
   },
 
-  create(data: PayableCreate): { success: true; payable: Payable } | { success: false; errors: string[] } {
+  create(data: PayableCreate): ServiceResult<Payable> {
     const validation = validatePayableCreate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const payable = PayableRepository.create(data);
-    return { success: true, payable };
+    return success(payable);
   },
 
-  update(id: string, data: PayableUpdate): { success: true; payable: Payable } | { success: false; errors: string[] } {
+  update(id: string, data: PayableUpdate): ServiceResult<Payable> {
     const validation = validatePayableUpdate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const payable = PayableRepository.update(id, data);
     if (!payable) {
-      return { success: false, errors: ['Payable not found'] };
+      return failure(['Payable not found']);
     }
 
-    return { success: true, payable };
+    return success(payable);
   },
 
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const payable = PayableRepository.findById(id);
-    if (!payable) return false;
+    if (!payable) {
+      return failure(['Payable not found']);
+    }
     PayableRepository.delete(id);
-    return true;
+    return success(undefined);
   },
 
   /**
    * Marks a payable as paid, creates a transaction, and generates next recurring instance
+   * All operations are wrapped in a transaction for atomicity
    */
-  markPaid(
-    payment: PayablePayment
-  ): { success: true; payable: Payable; transaction: Transaction; nextPayable?: Payable } | { success: false; errors: string[] } {
+  markPaid(payment: PayablePayment): ServiceResult<MarkPaidResult> {
+    // Validation (before transaction)
     const payable = PayableRepository.findById(payment.payableId);
     if (!payable) {
-      return { success: false, errors: ['Payable not found'] };
+      return failure(['Payable not found']);
     }
 
     if (payable.isPaid) {
-      return { success: false, errors: ['Payable is already paid'] };
+      return failure(['Payable is already paid']);
     }
 
     const account = AccountRepository.findById(payment.paidFromAccountId);
     if (!account) {
-      return { success: false, errors: ['Account not found'] };
+      return failure(['Account not found']);
     }
 
     const paidDate = payment.paidDate || new Date().toISOString().split('T')[0];
     const amount = payment.actualAmount ?? payable.amount;
 
-    // Create the transaction (DEBIT from bank account)
-    const transactionResult = TransactionService.create({
-      accountId: payment.paidFromAccountId,
-      type: TransactionType.DEBIT,
-      amount,
-      description: `Bill: ${payable.name}`,
-      date: paidDate,
-      categoryId: payable.categoryId,
-      linkedPayableId: payable.id,
-      notes: payment.notes,
-    });
-
-    if (!transactionResult.success) {
-      return { success: false, errors: transactionResult.errors };
+    // Check for insufficient funds on bank account payments
+    if (account.type === 'bank' && account.balance < amount) {
+      return failure(['Insufficient funds']);
     }
 
-    // Mark payable as paid
-    const updatedPayable = PayableRepository.markPaid(
-      payment.payableId,
-      payment.paidFromAccountId,
-      paidDate,
-      transactionResult.transaction.id
-    );
+    try {
+      const result = withTransaction(() => {
+        // Create the transaction record directly via repository
+        const transaction = TransactionRepository.create({
+          accountId: payment.paidFromAccountId,
+          type: TransactionType.DEBIT,
+          amount,
+          description: `Bill: ${payable.name}`,
+          date: paidDate,
+          categoryId: payable.categoryId,
+          linkedPayableId: payable.id,
+          notes: payment.notes,
+        });
 
-    if (!updatedPayable) {
-      return { success: false, errors: ['Failed to mark payable as paid'] };
+        // Update account balance atomically
+        // DEBIT decreases bank balance, increases credit balance
+        const balanceChange = account.type === 'bank' ? -amount : amount;
+        const balanceSuccess = AccountRepository.atomicAdjustBalance(
+          payment.paidFromAccountId,
+          balanceChange
+        );
+        if (!balanceSuccess) {
+          throw new Error('Failed to update account balance');
+        }
+
+        // Mark payable as paid
+        const updatedPayable = PayableRepository.markPaid(
+          payment.payableId,
+          payment.paidFromAccountId,
+          paidDate,
+          transaction.id
+        );
+
+        if (!updatedPayable) {
+          throw new Error('Failed to mark payable as paid');
+        }
+
+        // Generate next recurring instance if applicable (within transaction)
+        let nextPayable: Payable | undefined;
+        if (payable.isRecurring && payable.recurrenceRule) {
+          nextPayable = this.generateNextInstance(payable) ?? undefined;
+        }
+
+        return { payable: updatedPayable, transaction, nextPayable };
+      });
+
+      return success(result);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to mark payable as paid']);
     }
-
-    // Generate next recurring instance if applicable
-    let nextPayable: Payable | undefined;
-    if (payable.isRecurring && payable.recurrenceRule) {
-      nextPayable = this.generateNextInstance(payable) ?? undefined;
-    }
-
-    return {
-      success: true,
-      payable: updatedPayable,
-      transaction: transactionResult.transaction,
-      nextPayable,
-    };
   },
 
   /**
    * Marks a payable as unpaid and removes the linked transaction
+   * All operations are wrapped in a transaction for atomicity
    */
-  markUnpaid(id: string): { success: true; payable: Payable } | { success: false; errors: string[] } {
+  markUnpaid(id: string): ServiceResult<Payable> {
+    // Validation (before transaction)
     const payable = PayableRepository.findById(id);
     if (!payable) {
-      return { success: false, errors: ['Payable not found'] };
+      return failure(['Payable not found']);
     }
 
     if (!payable.isPaid) {
-      return { success: false, errors: ['Payable is not paid'] };
+      return failure(['Payable is not paid']);
     }
 
-    // Delete the linked transaction if it exists
-    if (payable.linkedTransactionId) {
-      TransactionService.delete(payable.linkedTransactionId);
-    }
+    try {
+      const updatedPayable = withTransaction(() => {
+        // Delete the linked transaction and reverse balance if it exists
+        if (payable.linkedTransactionId) {
+          const transaction = TransactionRepository.findById(payable.linkedTransactionId);
+          if (transaction) {
+            const account = AccountRepository.findById(transaction.accountId);
+            if (account) {
+              // Reverse the transaction effect (DEBIT was -bank/+credit, so reverse is +bank/-credit)
+              const reverseChange = account.type === 'bank' ? transaction.amount : -transaction.amount;
+              AccountRepository.atomicAdjustBalance(transaction.accountId, reverseChange);
+            }
+            TransactionRepository.delete(payable.linkedTransactionId);
+          }
+        }
 
-    const updatedPayable = PayableRepository.markUnpaid(id);
-    if (!updatedPayable) {
-      return { success: false, errors: ['Failed to mark payable as unpaid'] };
-    }
+        const result = PayableRepository.markUnpaid(id);
+        if (!result) {
+          throw new Error('Failed to mark payable as unpaid');
+        }
 
-    return { success: true, payable: updatedPayable };
+        return result;
+      });
+
+      return success(updatedPayable);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to mark payable as unpaid']);
+    }
   },
 
   /**

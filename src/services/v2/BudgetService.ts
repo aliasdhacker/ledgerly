@@ -5,6 +5,8 @@ import { BudgetRepository, TransactionRepository } from '../../repositories';
 import { validateBudgetCreate, validateBudgetUpdate } from '../../validation';
 import type { Budget, BudgetCreate, BudgetUpdate, BudgetProgress } from '../../types/budget';
 import { TransactionType, RecurrenceFrequency } from '../../types/common';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface BudgetSummary {
   totalBudgeted: number;
@@ -35,10 +37,10 @@ export const BudgetService = {
     return BudgetRepository.findOverallBudget();
   },
 
-  create(data: BudgetCreate): { success: true; budget: Budget } | { success: false; errors: string[] } {
+  create(data: BudgetCreate): ServiceResult<Budget> {
     const validation = validateBudgetCreate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     // Check if budget already exists for this category in this period
@@ -46,33 +48,35 @@ export const BudgetService = {
       const existing = BudgetRepository.findByCategory(data.categoryId)
         .find((b) => b.period === data.period);
       if (existing) {
-        return { success: false, errors: ['A budget already exists for this category and period'] };
+        return failure(['A budget already exists for this category and period']);
       }
     }
 
     const budget = BudgetRepository.create(data);
-    return { success: true, budget };
+    return success(budget);
   },
 
-  update(id: string, data: BudgetUpdate): { success: true; budget: Budget } | { success: false; errors: string[] } {
+  update(id: string, data: BudgetUpdate): ServiceResult<Budget> {
     const validation = validateBudgetUpdate(data);
     if (!validation.success) {
-      return { success: false, errors: Object.values(validation.errors) };
+      return failure(Object.values(validation.errors));
     }
 
     const budget = BudgetRepository.update(id, data);
     if (!budget) {
-      return { success: false, errors: ['Budget not found'] };
+      return failure(['Budget not found']);
     }
 
-    return { success: true, budget };
+    return success(budget);
   },
 
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const budget = BudgetRepository.findById(id);
-    if (!budget) return false;
+    if (!budget) {
+      return failure(['Budget not found']);
+    }
     BudgetRepository.delete(id);
-    return true;
+    return success(undefined);
   },
 
   // Progress Calculation

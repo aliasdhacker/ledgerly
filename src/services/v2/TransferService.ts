@@ -2,7 +2,10 @@
 // Business logic for transferring money between accounts
 
 import { TransferRepository, AccountRepository } from '../../repositories';
+import { withTransaction } from '../../db';
 import type { Transfer, TransferCreate } from '../../types/transaction';
+import type { ServiceResult } from '../../types/common';
+import { success, failure } from '../../types/common';
 
 export interface TransferResult {
   transfer: Transfer;
@@ -30,129 +33,135 @@ export const TransferService = {
    * - A DEBIT transaction on the source account (money leaving)
    * - A CREDIT transaction on the destination account (money arriving)
    * - A transfer record linking them
-   * And updates both account balances
+   * And updates both account balances atomically
    */
-  create(
-    data: TransferCreate
-  ): { success: true; result: TransferResult } | { success: false; errors: string[] } {
+  create(data: TransferCreate): ServiceResult<TransferResult> {
     // Validation
     if (!data.fromAccountId || !data.toAccountId) {
-      return { success: false, errors: ['Both accounts are required'] };
+      return failure(['Both accounts are required']);
     }
 
     if (data.fromAccountId === data.toAccountId) {
-      return { success: false, errors: ['Cannot transfer to the same account'] };
+      return failure(['Cannot transfer to the same account']);
     }
 
     if (!data.amount || data.amount <= 0) {
-      return { success: false, errors: ['Amount must be positive'] };
+      return failure(['Amount must be positive']);
     }
 
     if (!data.date) {
-      return { success: false, errors: ['Date is required'] };
+      return failure(['Date is required']);
     }
 
-    // Verify accounts exist
+    // Verify accounts exist (before transaction)
     const fromAccount = AccountRepository.findById(data.fromAccountId);
     if (!fromAccount) {
-      return { success: false, errors: ['Source account not found'] };
+      return failure(['Source account not found']);
     }
 
     const toAccount = AccountRepository.findById(data.toAccountId);
     if (!toAccount) {
-      return { success: false, errors: ['Destination account not found'] };
+      return failure(['Destination account not found']);
     }
 
-    // Create the transfer (this creates the transactions too)
-    const transfer = TransferRepository.createWithTransactions(data);
-
-    // Update account balances
-    // For bank accounts: DEBIT decreases, CREDIT increases
-    // For credit accounts: DEBIT increases (charge), CREDIT decreases (payment)
-
-    let fromNewBalance: number;
-    let toNewBalance: number;
-
-    if (fromAccount.type === 'bank') {
-      // Money leaving bank account (DEBIT)
-      fromNewBalance = fromAccount.balance - data.amount;
-    } else {
-      // Money leaving credit account = payment to another account increases credit balance
-      fromNewBalance = fromAccount.balance + data.amount;
+    // Check for insufficient funds in bank accounts
+    if (fromAccount.type === 'bank' && fromAccount.balance < data.amount) {
+      return failure(['Insufficient funds in source account']);
     }
 
-    if (toAccount.type === 'bank') {
-      // Money arriving to bank account (CREDIT)
-      toNewBalance = toAccount.balance + data.amount;
-    } else {
-      // Money arriving to credit account = payment reduces balance
-      toNewBalance = toAccount.balance - data.amount;
+    try {
+      // Wrap entire operation in transaction for atomicity
+      const result = withTransaction(() => {
+        // Create the transfer (this creates the transactions too)
+        const transfer = TransferRepository.createWithTransactions(data);
+
+        // Calculate balance adjustments
+        // For bank accounts: DEBIT decreases, CREDIT increases
+        // For credit accounts: DEBIT increases (charge), CREDIT decreases (payment)
+        const fromDelta = fromAccount.type === 'bank' ? -data.amount : data.amount;
+        const toDelta = toAccount.type === 'bank' ? data.amount : -data.amount;
+
+        // Use atomic balance adjustments
+        const fromSuccess = AccountRepository.atomicAdjustBalance(data.fromAccountId, fromDelta);
+        if (!fromSuccess) {
+          throw new Error('Failed to update source account balance');
+        }
+
+        const toSuccess = AccountRepository.atomicAdjustBalance(data.toAccountId, toDelta);
+        if (!toSuccess) {
+          throw new Error('Failed to update destination account balance');
+        }
+
+        // Get updated balances for return value
+        const updatedFrom = AccountRepository.findById(data.fromAccountId);
+        const updatedTo = AccountRepository.findById(data.toAccountId);
+
+        return {
+          transfer,
+          fromAccountNewBalance: updatedFrom?.balance ?? 0,
+          toAccountNewBalance: updatedTo?.balance ?? 0,
+        };
+      });
+
+      return success(result);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Transfer failed']);
     }
-
-    AccountRepository.updateBalance(data.fromAccountId, fromNewBalance);
-    AccountRepository.updateBalance(data.toAccountId, toNewBalance);
-
-    return {
-      success: true,
-      result: {
-        transfer,
-        fromAccountNewBalance: fromNewBalance,
-        toAccountNewBalance: toNewBalance,
-      },
-    };
   },
 
   /**
-   * Deletes a transfer and reverses the account balance changes
+   * Deletes a transfer and reverses the account balance changes atomically
    */
-  delete(id: string): boolean {
+  delete(id: string): ServiceResult<void> {
     const transfer = TransferRepository.findById(id);
-    if (!transfer) return false;
+    if (!transfer) {
+      return failure(['Transfer not found']);
+    }
 
     const fromAccount = AccountRepository.findById(transfer.fromAccountId);
     const toAccount = AccountRepository.findById(transfer.toAccountId);
 
-    // Reverse balance changes
-    if (fromAccount) {
-      if (fromAccount.type === 'bank') {
-        // Reverse: add back the money that was debited
-        AccountRepository.updateBalance(transfer.fromAccountId, fromAccount.balance + transfer.amount);
-      } else {
-        // Reverse: subtract the charge that was added
-        AccountRepository.updateBalance(transfer.fromAccountId, fromAccount.balance - transfer.amount);
-      }
-    }
+    try {
+      withTransaction(() => {
+        // Reverse balance changes using atomic adjustments
+        if (fromAccount) {
+          // Reverse: bank gets money back (+), credit account reduces (-)
+          const fromDelta = fromAccount.type === 'bank' ? transfer.amount : -transfer.amount;
+          AccountRepository.atomicAdjustBalance(transfer.fromAccountId, fromDelta);
+        }
 
-    if (toAccount) {
-      if (toAccount.type === 'bank') {
-        // Reverse: subtract the money that was credited
-        AccountRepository.updateBalance(transfer.toAccountId, toAccount.balance - transfer.amount);
-      } else {
-        // Reverse: add back the balance that was reduced
-        AccountRepository.updateBalance(transfer.toAccountId, toAccount.balance + transfer.amount);
-      }
-    }
+        if (toAccount) {
+          // Reverse: bank loses money (-), credit account increases (+)
+          const toDelta = toAccount.type === 'bank' ? -transfer.amount : transfer.amount;
+          AccountRepository.atomicAdjustBalance(transfer.toAccountId, toDelta);
+        }
 
-    TransferRepository.delete(id);
-    return true;
+        TransferRepository.delete(id);
+      });
+      return success(undefined);
+    } catch (error) {
+      return failure([error instanceof Error ? error.message : 'Failed to delete transfer']);
+    }
   },
 
   // Helpers
 
   /**
    * Gets all transfers for display with account names
+   * Uses batch loading to avoid N+1 queries
    */
-  getAllWithAccounts(): Array<Transfer & { fromAccountName: string; toAccountName: string }> {
+  getAllWithAccounts(): (Transfer & { fromAccountName: string; toAccountName: string })[] {
     const transfers = TransferRepository.findAll();
-    return transfers.map((t) => {
-      const fromAccount = AccountRepository.findById(t.fromAccountId);
-      const toAccount = AccountRepository.findById(t.toAccountId);
-      return {
-        ...t,
-        fromAccountName: fromAccount?.name ?? 'Unknown',
-        toAccountName: toAccount?.name ?? 'Unknown',
-      };
-    });
+
+    // Batch load all accounts in single query (avoids N+1)
+    const accounts = AccountRepository.findAll();
+    const accountMap = new Map(accounts.map((a) => [a.id, a.name]));
+
+    return transfers.map((t) => ({
+      ...t,
+      fromAccountName: accountMap.get(t.fromAccountId) ?? 'Unknown',
+      toAccountName: accountMap.get(t.toAccountId) ?? 'Unknown',
+    }));
   },
 
   /**
@@ -163,7 +172,7 @@ export const TransferService = {
     creditAccountId: string,
     amount: number,
     date?: string
-  ): { success: true; result: TransferResult } | { success: false; errors: string[] } {
+  ): ServiceResult<TransferResult> {
     return this.create({
       fromAccountId: bankAccountId,
       toAccountId: creditAccountId,

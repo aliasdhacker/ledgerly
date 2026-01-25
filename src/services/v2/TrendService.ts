@@ -2,6 +2,7 @@
 // Analytics and trend calculations for financial insights
 
 import { TransactionRepository, CategoryRepository, AccountRepository } from '../../repositories';
+import { queryAll } from '../../db';
 import { TransactionType } from '../../types/common';
 import type { Category } from '../../types/category';
 
@@ -299,43 +300,61 @@ export const TrendService = {
 
   /**
    * Get account balance trends over time
+   * Uses single aggregation query to avoid N+1
    */
   getAccountTrends(startDate: string, endDate: string): AccountTrend[] {
+    // Get all active accounts
     const accounts = AccountRepository.findAll({ isActive: true });
-    const result: AccountTrend[] = [];
 
-    for (const account of accounts) {
-      // Get transactions for this account in the period
-      const transactions = TransactionRepository.findAll({
-        accountId: account.id,
-        startDate,
-        endDate,
-      });
+    // Single query to get aggregated transaction sums per account
+    const transactionSums = queryAll<{
+      accountId: string;
+      creditSum: number;
+      debitSum: number;
+    }>(
+      `SELECT
+         account_id as accountId,
+         COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) as creditSum,
+         COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) as debitSum
+       FROM transactions
+       WHERE sync_status != 'deleted'
+         AND date >= ?
+         AND date <= ?
+       GROUP BY account_id`,
+      [startDate, endDate]
+    );
+
+    // Create a map for quick lookup
+    const sumsByAccount = new Map(
+      transactionSums.map((s) => [s.accountId, { creditSum: s.creditSum, debitSum: s.debitSum }])
+    );
+
+    return accounts.map((account) => {
+      const sums = sumsByAccount.get(account.id) || { creditSum: 0, debitSum: 0 };
 
       // Calculate the change during this period
-      let change = 0;
-      for (const t of transactions) {
-        if (account.type === 'bank') {
-          change += t.type === TransactionType.CREDIT ? t.amount : -t.amount;
-        } else {
-          change += t.type === TransactionType.CREDIT ? -t.amount : t.amount;
-        }
+      let change: number;
+      if (account.type === 'bank') {
+        // Bank: credits increase, debits decrease
+        change = sums.creditSum - sums.debitSum;
+      } else {
+        // Credit card: debits increase (charges), credits decrease (payments)
+        change = sums.debitSum - sums.creditSum;
       }
 
       const startBalance = account.balance - change;
-      const changePercent = startBalance !== 0 ? Math.round((change / Math.abs(startBalance)) * 100) : 0;
+      const changePercent =
+        startBalance !== 0 ? Math.round((change / Math.abs(startBalance)) * 100) : 0;
 
-      result.push({
+      return {
         accountId: account.id,
         accountName: account.name,
         startBalance,
         endBalance: account.balance,
         change,
         changePercent,
-      });
-    }
-
-    return result;
+      };
+    });
   },
 
   // Quick access methods
