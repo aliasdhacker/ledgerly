@@ -5,7 +5,7 @@ import { Transaction, Bill, Debt } from '../types';
 // For development: use your local machine's IP
 // For production: use your server's public IP or domain
 const OCR_PIPELINE_URL = __DEV__
-  ? 'http://192.168.98.104:8000'  // Mac running OCR pipeline (Docker)
+  ? 'http://192.168.98.108:8000'
   : 'https://your-production-url.com';
 
 export type DocumentType = 'bank_statement' | 'credit_card' | 'bill' | 'loan' | 'auto';
