@@ -10,9 +10,7 @@ import { CredentialService } from './CredentialService';
 // OCR Pipeline URL configuration
 // Stored in settings for runtime configurability
 const OCR_SETTINGS_KEY = 'ocr_pipeline_url';
-const DEFAULT_OCR_URL = __DEV__
-  ? 'http://localhost:8000'
-  : 'https://api.acarr.org';
+const DEFAULT_OCR_URL = 'https://api.acarr.org';
 
 function getOCRPipelineUrl(): string {
   const saved = getSetting(OCR_SETTINGS_KEY);
