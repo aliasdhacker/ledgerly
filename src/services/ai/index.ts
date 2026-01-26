@@ -99,8 +99,8 @@ export const AIService = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      // Get auth header if credentials are configured
-      const authHeader = await CredentialService.getBasicAuthHeader();
+      // Get auth header from build-time credentials
+      const authHeader = CredentialService.getBasicAuthHeader();
       const headers: Record<string, string> = {};
       if (authHeader) {
         headers['Authorization'] = authHeader;
@@ -172,8 +172,8 @@ export const AIService = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
-      // Get auth header if credentials are configured
-      const authHeader = await CredentialService.getBasicAuthHeader();
+      // Get auth header from build-time credentials
+      const authHeader = CredentialService.getBasicAuthHeader();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (authHeader) {
         headers['Authorization'] = authHeader;

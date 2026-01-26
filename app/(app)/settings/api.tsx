@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   Pressable,
   ScrollView,
   Alert,
@@ -11,64 +10,17 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, Typography, Spacing, BorderRadius, CommonStyles } from '../../../src/constants';
+import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
 import { CredentialService } from '../../../src/services/CredentialService';
 import { OCRService } from '../../../src/services/OCRService';
 import { AIService } from '../../../src/services/v2';
 
 export default function ApiSettingsScreen() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [hasCredentials, setHasCredentials] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<'unknown' | 'ok' | 'error'>('unknown');
   const [aiStatus, setAiStatus] = useState<'unknown' | 'ok' | 'error'>('unknown');
 
-  useEffect(() => {
-    checkExistingCredentials();
-  }, []);
-
-  const checkExistingCredentials = async () => {
-    const has = await CredentialService.hasCredentials();
-    setHasCredentials(has);
-    if (has) {
-      const creds = await CredentialService.getCredentials();
-      if (creds) {
-        setUsername(creds.username);
-        setPassword('••••••••'); // Don't show actual password
-      }
-    }
-  };
-
-  const handleSave = async () => {
-    if (!username.trim()) {
-      Alert.alert('Error', 'Please enter a username');
-      return;
-    }
-    if (!password.trim() || (hasCredentials && password === '••••••••')) {
-      // Keep existing password if not changed
-      if (!hasCredentials) {
-        Alert.alert('Error', 'Please enter a password');
-        return;
-      }
-    }
-
-    setSaving(true);
-    try {
-      // Only save if password was changed
-      if (password !== '••••••••') {
-        await CredentialService.setCredentials(username.trim(), password);
-      }
-      setHasCredentials(true);
-      Alert.alert('Success', 'API credentials saved securely');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save credentials');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const hasCredentials = CredentialService.hasCredentials();
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -99,28 +51,6 @@ export default function ApiSettingsScreen() {
     }
   };
 
-  const handleClearCredentials = () => {
-    Alert.alert(
-      'Clear Credentials',
-      'Are you sure you want to remove saved API credentials?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            await CredentialService.clearCredentials();
-            setUsername('');
-            setPassword('');
-            setHasCredentials(false);
-            setOcrStatus('unknown');
-            setAiStatus('unknown');
-          },
-        },
-      ]
-    );
-  };
-
   const StatusIcon = ({ status }: { status: 'unknown' | 'ok' | 'error' }) => {
     if (status === 'unknown') return null;
     return (
@@ -138,103 +68,72 @@ export default function ApiSettingsScreen() {
       <Stack.Screen options={{ title: 'API Settings' }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.description}>
-          Configure credentials for the OCR pipeline and AI services. These are stored securely on your device.
+          Service credentials are configured at build time. Use the button below to test connectivity to the backend services.
         </Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Credentials</Text>
+          <Text style={styles.sectionTitle}>Configuration</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Username</Text>
-            <TextInput
-              style={styles.input}
-              value={username}
-              onChangeText={setUsername}
-              placeholder="Enter username"
-              placeholderTextColor={COLORS.gray400}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.passwordContainer}>
-              <TextInput
-                style={[styles.input, styles.passwordInput]}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Enter password"
-                placeholderTextColor={COLORS.gray400}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>Credentials</Text>
+            <View style={styles.configValue}>
+              <Ionicons
+                name={hasCredentials ? 'checkmark-circle' : 'close-circle'}
+                size={16}
+                color={hasCredentials ? COLORS.success : COLORS.error}
               />
-              <Pressable
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeButton}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={COLORS.gray500}
-                />
-              </Pressable>
+              <Text style={[styles.configText, { color: hasCredentials ? COLORS.success : COLORS.error }]}>
+                {hasCredentials ? 'Configured' : 'Not configured'}
+              </Text>
             </View>
           </View>
 
-          <Pressable
-            style={[styles.button, styles.primaryButton]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save Credentials</Text>
-            )}
-          </Pressable>
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>OCR Endpoint</Text>
+            <Text style={styles.configText}>{CredentialService.getOCREndpoint()}</Text>
+          </View>
+
+          <View style={styles.configRow}>
+            <Text style={styles.configLabel}>AI Endpoint</Text>
+            <Text style={styles.configText}>{CredentialService.getAIEndpoint()}</Text>
+          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Connection Status</Text>
 
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>OCR Pipeline (api.acarr.org)</Text>
+            <Text style={styles.statusLabel}>OCR Pipeline</Text>
             <StatusIcon status={ocrStatus} />
           </View>
 
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>AI Service (ollama.acarr.org)</Text>
+            <Text style={styles.statusLabel}>AI Service</Text>
             <StatusIcon status={aiStatus} />
           </View>
 
           <Pressable
-            style={[styles.button, styles.secondaryButton]}
+            style={[styles.button, styles.primaryButton]}
             onPress={handleTestConnection}
-            disabled={testing || !hasCredentials}
+            disabled={testing}
           >
             {testing ? (
-              <ActivityIndicator color={COLORS.primary} />
+              <ActivityIndicator color={COLORS.white} />
             ) : (
               <>
-                <Ionicons name="wifi" size={18} color={COLORS.primary} />
-                <Text style={styles.secondaryButtonText}>Test Connection</Text>
+                <Ionicons name="wifi" size={18} color={COLORS.white} />
+                <Text style={styles.primaryButtonText}>Test Connection</Text>
               </>
             )}
           </Pressable>
         </View>
 
-        {hasCredentials && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Danger Zone</Text>
-            <Pressable
-              style={[styles.button, styles.dangerButton]}
-              onPress={handleClearCredentials}
-            >
-              <Ionicons name="trash-outline" size={18} color={COLORS.error} />
-              <Text style={styles.dangerButtonText}>Clear Saved Credentials</Text>
-            </Pressable>
+        {!hasCredentials && (
+          <View style={styles.warningSection}>
+            <Ionicons name="warning" size={24} color={COLORS.warning} />
+            <Text style={styles.warningText}>
+              API credentials are not configured. The app needs to be rebuilt with the correct environment variables.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -252,83 +151,39 @@ const styles = StyleSheet.create({
   },
   description: {
     ...Typography.body,
-    color: COLORS.gray600,
+    color: COLORS.textSecondary,
     marginBottom: Spacing.xl,
   },
   section: {
-    marginBottom: Spacing.xl,
+    backgroundColor: COLORS.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
   },
   sectionTitle: {
     ...Typography.title3,
     marginBottom: Spacing.md,
   },
-  inputGroup: {
-    marginBottom: Spacing.md,
+  configRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  label: {
-    ...Typography.caption,
-    color: COLORS.gray600,
-    marginBottom: Spacing.xs,
-  },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+  configLabel: {
     ...Typography.body,
-    color: COLORS.gray900,
+    color: COLORS.textSecondary,
   },
-  passwordContainer: {
+  configValue: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.xs,
   },
-  passwordInput: {
-    flex: 1,
-    paddingRight: 48,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: Spacing.md,
-    padding: Spacing.xs,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.sm,
-  },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-    marginTop: Spacing.md,
-  },
-  primaryButtonText: {
+  configText: {
     ...Typography.body,
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    marginTop: Spacing.md,
-  },
-  secondaryButtonText: {
-    ...Typography.body,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  dangerButton: {
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.error,
-  },
-  dangerButtonText: {
-    ...Typography.body,
-    color: COLORS.error,
-    fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   statusRow: {
     flexDirection: 'row',
@@ -340,6 +195,36 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     ...Typography.body,
-    color: COLORS.gray700,
+    color: COLORS.textPrimary,
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.primary,
+  },
+  primaryButtonText: {
+    ...Typography.body,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  warningSection: {
+    backgroundColor: COLORS.warning + '20',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.md,
+  },
+  warningText: {
+    ...Typography.body,
+    color: COLORS.warning,
+    flex: 1,
   },
 });

@@ -1,14 +1,10 @@
-// Secure Credential Service for DriftMoney
-// Stores API credentials in secure storage (Keychain on iOS, Keystore on Android)
+// Credential Service for DriftMoney
+// Provides service credentials injected at build time via expo-constants
 
-import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
-// Secure storage keys
-const KEYS = {
-  API_USERNAME: 'driftmoney_api_username',
-  API_PASSWORD: 'driftmoney_api_password',
-  CREDENTIALS_SET: 'driftmoney_credentials_set',
-} as const;
+// Get credentials from app.config.js extra field
+const extra = Constants.expoConfig?.extra || {};
 
 export interface ApiCredentials {
   username: string;
@@ -17,48 +13,30 @@ export interface ApiCredentials {
 
 export const CredentialService = {
   /**
-   * Check if credentials have been configured
+   * Check if service credentials are configured (baked into build)
    */
-  async hasCredentials(): Promise<boolean> {
-    try {
-      const set = await SecureStore.getItemAsync(KEYS.CREDENTIALS_SET);
-      return set === 'true';
-    } catch {
-      return false;
-    }
+  hasCredentials(): boolean {
+    return !!(extra.apiUsername && extra.apiPassword);
   },
 
   /**
-   * Store API credentials securely
+   * Get the service credentials
    */
-  async setCredentials(username: string, password: string): Promise<void> {
-    await SecureStore.setItemAsync(KEYS.API_USERNAME, username);
-    await SecureStore.setItemAsync(KEYS.API_PASSWORD, password);
-    await SecureStore.setItemAsync(KEYS.CREDENTIALS_SET, 'true');
-  },
-
-  /**
-   * Retrieve stored credentials
-   */
-  async getCredentials(): Promise<ApiCredentials | null> {
-    try {
-      const username = await SecureStore.getItemAsync(KEYS.API_USERNAME);
-      const password = await SecureStore.getItemAsync(KEYS.API_PASSWORD);
-
-      if (username && password) {
-        return { username, password };
-      }
-      return null;
-    } catch {
+  getCredentials(): ApiCredentials | null {
+    if (!extra.apiUsername || !extra.apiPassword) {
       return null;
     }
+    return {
+      username: extra.apiUsername,
+      password: extra.apiPassword,
+    };
   },
 
   /**
    * Get Basic Auth header value
    */
-  async getBasicAuthHeader(): Promise<string | null> {
-    const credentials = await this.getCredentials();
+  getBasicAuthHeader(): string | null {
+    const credentials = this.getCredentials();
     if (!credentials) return null;
 
     const base64 = btoa(`${credentials.username}:${credentials.password}`);
@@ -66,30 +44,17 @@ export const CredentialService = {
   },
 
   /**
-   * Clear stored credentials
+   * Get configured OCR endpoint
    */
-  async clearCredentials(): Promise<void> {
-    await SecureStore.deleteItemAsync(KEYS.API_USERNAME);
-    await SecureStore.deleteItemAsync(KEYS.API_PASSWORD);
-    await SecureStore.deleteItemAsync(KEYS.CREDENTIALS_SET);
+  getOCREndpoint(): string {
+    return extra.ocrEndpoint || 'https://api.acarr.org';
   },
 
   /**
-   * Test credentials against an endpoint
+   * Get configured AI endpoint
    */
-  async testCredentials(url: string, username: string, password: string): Promise<boolean> {
-    try {
-      const base64 = btoa(`${username}:${password}`);
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${base64}`,
-        },
-      });
-      return response.ok || response.status === 401 === false;
-    } catch {
-      return false;
-    }
+  getAIEndpoint(): string {
+    return extra.aiEndpoint || 'https://ollama.acarr.org';
   },
 };
 

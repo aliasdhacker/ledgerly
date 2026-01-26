@@ -136,8 +136,8 @@ export const OCRService = {
    */
   async checkHealth(): Promise<OCRHealthStatus | null> {
     try {
-      // Get auth header if credentials are configured
-      const authHeader = await CredentialService.getBasicAuthHeader();
+      // Get auth header from build-time credentials
+      const authHeader = CredentialService.getBasicAuthHeader();
       const headers: Record<string, string> = { 'Accept': 'application/json' };
       if (authHeader) {
         headers['Authorization'] = authHeader;
@@ -186,8 +186,8 @@ export const OCRService = {
       } as any);
       formData.append('document_type', documentType);
 
-      // Get auth header if credentials are configured
-      const authHeader = await CredentialService.getBasicAuthHeader();
+      // Get auth header from build-time credentials
+      const authHeader = CredentialService.getBasicAuthHeader();
       const headers: Record<string, string> = { 'Accept': 'application/json' };
       if (authHeader) {
         headers['Authorization'] = authHeader;
@@ -335,8 +335,8 @@ export const OCRService = {
         type: mimeType,
       } as any);
 
-      // Get auth header if credentials are configured
-      const authHeader = await CredentialService.getBasicAuthHeader();
+      // Get auth header from build-time credentials
+      const authHeader = CredentialService.getBasicAuthHeader();
       const headers: Record<string, string> = { 'Accept': 'application/json' };
       if (authHeader) {
         headers['Authorization'] = authHeader;
