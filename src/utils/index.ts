@@ -6,3 +6,4 @@ export * from './moneyUtils';
 export * from './formatUtils';
 export * from './sanitize';
 export * from './haptics';
+export * from './responsive';

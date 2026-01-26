@@ -8,3 +8,8 @@ export { Card } from './Card';
 export { ProgressBar } from './ProgressBar';
 export { Badge } from './Badge';
 export { IconButton } from './IconButton';
+export {
+  ResponsiveContainer,
+  MasterDetailContainer,
+  GridContainer,
+} from './ResponsiveContainer';
