@@ -20,8 +20,15 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   showDetails = true,
 }) => {
   const isCredit = account.type === 'credit';
-  const iconName = isCredit ? 'card' : 'wallet';
-  const iconColor = isCredit ? COLORS.creditAccount : COLORS.bank;
+  const isLoan = account.type === 'loan';
+
+  const getIconAndColor = () => {
+    if (isCredit) return { iconName: 'card' as const, iconColor: COLORS.creditAccount };
+    if (isLoan) return { iconName: 'business-outline' as const, iconColor: COLORS.warning };
+    return { iconName: 'wallet' as const, iconColor: COLORS.bank };
+  };
+
+  const { iconName, iconColor } = getIconAndColor();
 
   return (
     <Pressable
@@ -50,11 +57,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           amount={account.balance}
           currency={account.currency}
           size="large"
-          colorize={isCredit}
+          colorize={isCredit || isLoan}
         />
         {isCredit && account.creditLimit && (
           <Text style={styles.limitText}>
             of {account.creditLimit.toLocaleString()} limit
+          </Text>
+        )}
+        {isLoan && account.loanPrincipal && (
+          <Text style={styles.limitText}>
+            of {account.loanPrincipal.toLocaleString()} original
           </Text>
         )}
       </View>
@@ -97,6 +109,44 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 <Text style={styles.creditLabel}>Min Payment</Text>
                 <MoneyText
                   amount={account.minimumPayment}
+                  size="small"
+                  style={styles.creditValue}
+                />
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      {showDetails && isLoan && account.loanPrincipal && (
+        <View style={styles.creditDetails}>
+          <View style={styles.utilizationBar}>
+            <View
+              style={[
+                styles.utilizationFill,
+                {
+                  width: `${account.loanPercentPaid ?? 0}%`,
+                  backgroundColor: COLORS.success,
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.creditInfo}>
+            <View style={styles.creditInfoItem}>
+              <Text style={styles.creditLabel}>Paid Off</Text>
+              <Text style={styles.creditValue}>{account.loanPercentPaid ?? 0}%</Text>
+            </View>
+            {account.loanInterestRate !== undefined && (
+              <View style={styles.creditInfoItem}>
+                <Text style={styles.creditLabel}>Rate</Text>
+                <Text style={styles.creditValue}>{account.loanInterestRate}% APR</Text>
+              </View>
+            )}
+            {account.loanMonthlyPayment && (
+              <View style={styles.creditInfoItem}>
+                <Text style={styles.creditLabel}>Monthly</Text>
+                <MoneyText
+                  amount={account.loanMonthlyPayment}
                   size="small"
                   style={styles.creditValue}
                 />

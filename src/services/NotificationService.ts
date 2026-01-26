@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { DatabaseService } from './DatabaseService';
+import { getSetting, setSetting } from '../db';
+import { PayableService } from './v2';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -53,11 +54,10 @@ export const NotificationService = {
       // Cancel existing daily reminders first
       await NotificationService.cancelDailyReminder();
 
-      // Get upcoming bills count for the notification message
-      const bills = DatabaseService.getBills();
-      const unpaidBills = bills.filter(b => !b.isPaid);
-      const unpaidCount = unpaidBills.length;
-      const unpaidTotal = unpaidBills.reduce((sum, b) => sum + b.amount, 0);
+      // Get upcoming payables count for the notification message
+      const unpaidPayables = PayableService.getUnpaid();
+      const unpaidCount = unpaidPayables.length;
+      const unpaidTotal = unpaidPayables.reduce((sum: number, p) => sum + p.amount, 0);
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
@@ -75,10 +75,10 @@ export const NotificationService = {
       });
 
       // Save reminder settings
-      DatabaseService.setSetting('daily_reminder_enabled', 'true');
-      DatabaseService.setSetting('daily_reminder_hour', hour.toString());
-      DatabaseService.setSetting('daily_reminder_minute', minute.toString());
-      DatabaseService.setSetting('daily_reminder_id', identifier);
+      setSetting('daily_reminder_enabled', 'true');
+      setSetting('daily_reminder_hour', hour.toString());
+      setSetting('daily_reminder_minute', minute.toString());
+      setSetting('daily_reminder_id', identifier);
 
       console.log(`Daily reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
       return identifier;
@@ -91,12 +91,12 @@ export const NotificationService = {
   // Cancel the daily reminder
   cancelDailyReminder: async (): Promise<void> => {
     try {
-      const existingId = DatabaseService.getSetting('daily_reminder_id');
+      const existingId = getSetting('daily_reminder_id');
       if (existingId) {
         await Notifications.cancelScheduledNotificationAsync(existingId);
       }
-      DatabaseService.setSetting('daily_reminder_enabled', 'false');
-      DatabaseService.setSetting('daily_reminder_id', '');
+      setSetting('daily_reminder_enabled', 'false');
+      setSetting('daily_reminder_id', '');
       console.log('Daily reminder cancelled');
     } catch (error) {
       console.error('Failed to cancel daily reminder:', error);
@@ -105,13 +105,13 @@ export const NotificationService = {
 
   // Check if daily reminder is enabled
   isDailyReminderEnabled: (): boolean => {
-    return DatabaseService.getSetting('daily_reminder_enabled') === 'true';
+    return getSetting('daily_reminder_enabled') === 'true';
   },
 
   // Get the scheduled reminder time
   getReminderTime: (): { hour: number; minute: number } => {
-    const hour = parseInt(DatabaseService.getSetting('daily_reminder_hour') || '9', 10);
-    const minute = parseInt(DatabaseService.getSetting('daily_reminder_minute') || '0', 10);
+    const hour = parseInt(getSetting('daily_reminder_hour') || '9', 10);
+    const minute = parseInt(getSetting('daily_reminder_minute') || '0', 10);
     return { hour, minute };
   },
 
@@ -149,8 +149,8 @@ export const NotificationService = {
   // Cancel all scheduled notifications
   cancelAllNotifications: async (): Promise<void> => {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    DatabaseService.setSetting('daily_reminder_enabled', 'false');
-    DatabaseService.setSetting('daily_reminder_id', '');
+    setSetting('daily_reminder_enabled', 'false');
+    setSetting('daily_reminder_id', '');
   },
 
   // Get all scheduled notifications (for debugging)

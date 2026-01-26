@@ -298,17 +298,18 @@ export const TransactionService = {
    * Calculates how a transaction affects the account balance
    * Bank accounts: CREDIT increases, DEBIT decreases
    * Credit accounts: CREDIT decreases (payment), DEBIT increases (charge)
+   * Loan accounts: CREDIT decreases (payment), DEBIT increases (fees/additional borrowing)
    */
   calculateBalanceChange(
     transactionType: TransactionType,
     amount: number,
-    accountType: 'bank' | 'credit'
+    accountType: 'bank' | 'credit' | 'loan'
   ): number {
     if (accountType === 'bank') {
       // Bank account: credit = +, debit = -
       return transactionType === TransactionType.CREDIT ? amount : -amount;
     } else {
-      // Credit account: credit = - (payment reduces balance), debit = + (charge increases balance)
+      // Credit/Loan account: credit = - (payment reduces balance), debit = + (charge increases balance)
       return transactionType === TransactionType.CREDIT ? -amount : amount;
     }
   },

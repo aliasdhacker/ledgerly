@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuthContext } from '../src/contexts/AuthContext';
 import { SyncProvider } from '../src/contexts/SyncContext';
 import { NotificationService } from '../src/services/NotificationService';
-import { DatabaseService } from '../src/services/DatabaseService';
+import { initializeDatabase, hasLegacyData, migrateLegacyData } from '../src/db';
 
 function RootLayoutNav() {
   const { isAuthenticated, isLoading } = useAuthContext();
@@ -16,7 +16,14 @@ function RootLayoutNav() {
   useEffect(() => {
     // Initialize database and request notification permissions on app start
     const initApp = async () => {
-      DatabaseService.init();
+      // Initialize v2 database (runs migrations)
+      initializeDatabase();
+
+      // Migrate legacy data if present
+      if (hasLegacyData()) {
+        console.log('[App] Migrating legacy data to v2 schema...');
+        migrateLegacyData();
+      }
 
       // Request notification permissions
       const granted = await NotificationService.requestPermissions();

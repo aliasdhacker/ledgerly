@@ -10,13 +10,16 @@ export interface BaseRow {
   updated_at: string;
 }
 
+// SQLite bind value type
+type SQLiteBindValue = string | number | null | boolean | Uint8Array;
+
 // Helper to get current ISO timestamp
 export const now = (): string => new Date().toISOString();
 
 // Generic query helpers
 export const queryAll = <T>(sql: string, params: unknown[] = []): T[] => {
   const db = getDatabase();
-  return db.getAllSync(sql, params) as T[];
+  return db.getAllSync(sql, params as SQLiteBindValue[]) as T[];
 };
 
 export const queryOne = <T>(sql: string, params: unknown[] = []): T | null => {
@@ -26,7 +29,7 @@ export const queryOne = <T>(sql: string, params: unknown[] = []): T | null => {
 
 export const execute = (sql: string, params: unknown[] = []): void => {
   const db = getDatabase();
-  db.runSync(sql, params);
+  db.runSync(sql, params as SQLiteBindValue[]);
 };
 
 // Mark record as synced

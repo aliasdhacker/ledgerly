@@ -5,8 +5,9 @@ import { createValidator, validators } from './validator';
 
 const { required, string, number, positiveNumber, boolean, oneOf, minLength, maxLength, min, max } = validators;
 
-const ACCOUNT_TYPES = ['bank', 'credit'] as const;
+const ACCOUNT_TYPES = ['bank', 'credit', 'loan'] as const;
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'MXN'] as const;
+const PAYMENT_FREQUENCIES = ['daily', 'weekly', 'biweekly', 'monthly', 'yearly'] as const;
 
 export const validateAccountCreate = createValidator<AccountCreate>({
   name: [required, string, minLength(1), maxLength(100)],
@@ -23,6 +24,15 @@ export const validateAccountCreate = createValidator<AccountCreate>({
   minimumPayment: [positiveNumber],
   paymentDueDay: [number, min(1), max(31)],
   apr: [number, min(0), max(100)],
+  // Loan fields
+  loanPrincipal: [positiveNumber],
+  loanInterestRate: [number, min(0), max(100)],
+  loanMonthlyPayment: [positiveNumber],
+  loanStartDate: [string],
+  loanEndDate: [string],
+  loanPaymentFrequency: [oneOf(PAYMENT_FREQUENCIES)],
+  loanPaymentDay: [number, min(1), max(31)],
+  linkedPayableId: [string],
 });
 
 export const validateAccountUpdate = createValidator<AccountUpdate>({
@@ -40,4 +50,13 @@ export const validateAccountUpdate = createValidator<AccountUpdate>({
   minimumPayment: [positiveNumber],
   paymentDueDay: [number, min(1), max(31)],
   apr: [number, min(0), max(100)],
+  // Loan fields
+  loanPrincipal: [positiveNumber],
+  loanInterestRate: [number, min(0), max(100)],
+  loanMonthlyPayment: [positiveNumber],
+  loanStartDate: [string],
+  loanEndDate: [string],
+  loanPaymentFrequency: [oneOf(PAYMENT_FREQUENCIES)],
+  loanPaymentDay: [number, min(1), max(31)],
+  linkedPayableId: [string],
 });

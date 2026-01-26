@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants';
 
 interface EmptyStateProps {
@@ -13,7 +14,7 @@ interface EmptyStateProps {
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon = '📭',
+  icon = 'mail-outline',
   title,
   message,
   actionLabel,
@@ -21,7 +22,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
+      <Ionicons name={icon as any} size={48} color={COLORS.textSecondary} style={styles.icon} />
       <Text style={styles.title}>{title}</Text>
       {message && <Text style={styles.message}>{message}</Text>}
       {actionLabel && onAction && (
@@ -42,7 +43,6 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
   icon: {
-    fontSize: 48,
     marginBottom: 16,
   },
   title: {

@@ -1,92 +1,66 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../src/constants';
 
 export default function AppLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textSecondary,
         headerStyle: {
-          backgroundColor: '#F2F2F7',
+          backgroundColor: COLORS.background,
+        },
+        headerTitleStyle: {
+          fontWeight: '600',
         },
         tabBarStyle: {
-          backgroundColor: '#F2F2F7',
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.border,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Draft',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calculator" size={size} color={color} />
+            <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="bills"
+        name="payables"
         options={{
-          title: 'Bills',
+          title: 'Payables',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list" size={size} color={color} />
+            <Ionicons name="document-text" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="add"
+        name="accounts"
         options={{
-          title: 'Add Bill',
+          title: 'Accounts',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle" size={size} color={color} />
+            <Ionicons name="wallet" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="transactions"
+        name="trends"
         options={{
-          title: 'Transactions',
+          title: 'Trends',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="swap-horizontal" size={size} color={color} />
+            <Ionicons name="stats-chart" size={size} color={color} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="income"
-        options={{
-          title: 'Income',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cash" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="debts"
-        options={{
-          title: 'Debts',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="card" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="import"
-        options={{
-          title: 'Import',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="scan" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
-          ),
-        }}
-      />
+      {/* Settings is accessible from Home screen, hidden from tabs */}
+      <Tabs.Screen name="settings" options={{ href: null, headerShown: false }} />
     </Tabs>
   );
 }

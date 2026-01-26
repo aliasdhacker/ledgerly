@@ -2,7 +2,7 @@
 import * as SQLite from 'expo-sqlite';
 
 export const DB_NAME = 'driftmoney.db';
-export const DB_VERSION = 2;
+export const DB_VERSION = 5;
 
 // Lazy-initialized database connection
 let _db: SQLite.SQLiteDatabase | null = null;

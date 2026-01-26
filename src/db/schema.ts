@@ -7,11 +7,11 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
--- Accounts (bank accounts, credit cards)
+-- Accounts (bank accounts, credit cards, loans)
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('bank', 'credit')),
+  type TEXT NOT NULL CHECK(type IN ('bank', 'credit', 'loan')),
   balance REAL NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'USD',
   institution_name TEXT,
@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS accounts (
   minimum_payment REAL,
   payment_due_day INTEGER,
   apr REAL,
+  loan_principal REAL,
+  loan_interest_rate REAL,
+  loan_monthly_payment REAL,
+  loan_start_date TEXT,
+  loan_end_date TEXT,
+  loan_payment_frequency TEXT,
+  loan_payment_day INTEGER,
+  linked_payable_id TEXT REFERENCES payables(id),
   sync_status TEXT NOT NULL DEFAULT 'dirty' CHECK(sync_status IN ('synced', 'dirty', 'deleted')),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

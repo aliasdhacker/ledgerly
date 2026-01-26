@@ -4,21 +4,24 @@ import {
   Text,
   StyleSheet,
   Switch,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   Alert,
   Platform,
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { NotificationService } from '../../src/services/NotificationService';
-import { DatabaseService } from '../../src/services/DatabaseService';
-import { useAuthContext } from '../../src/contexts/AuthContext';
-import { useSyncContext } from '../../src/contexts/SyncContext';
+import { NotificationService } from '../../../src/services/NotificationService';
+import { deleteAllData } from '../../../src/db';
+import { useAuthContext } from '../../../src/contexts/AuthContext';
+import { useSyncContext } from '../../../src/contexts/SyncContext';
+import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { user, signOut, isLoading: authLoading } = useAuthContext();
   const { status: syncStatus, lastSyncedAt, pendingChanges, sync } = useSyncContext();
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -107,28 +110,6 @@ export default function SettingsScreen() {
     return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
   };
 
-  const handleTestNotification = async () => {
-    const granted = await NotificationService.requestPermissions();
-    if (!granted) {
-      Alert.alert('Error', 'Notification permissions not granted');
-      return;
-    }
-
-    const { scheduleNotificationAsync, SchedulableTriggerInputTypes } = await import('expo-notifications');
-    await scheduleNotificationAsync({
-      content: {
-        title: 'Test Notification',
-        body: 'This is a test notification from Driftmoney!',
-      },
-      trigger: {
-        type: SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 2,
-      },
-    });
-
-    Alert.alert('Test Sent', 'You should receive a notification in 2 seconds');
-  };
-
   const handleSyncNow = async () => {
     const result = await sync();
     if (result.success) {
@@ -163,7 +144,7 @@ export default function SettingsScreen() {
   const handleDeleteAllData = () => {
     Alert.alert(
       'Delete All Data',
-      'Are you sure you want to delete ALL data? This will permanently remove all bills, debts, transactions, and account information. This action cannot be undone.',
+      'Are you sure you want to delete ALL data? This will permanently remove all accounts, transactions, and bills. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -179,7 +160,7 @@ export default function SettingsScreen() {
                   text: 'DELETE ALL',
                   style: 'destructive',
                   onPress: () => {
-                    DatabaseService.deleteAllData();
+                    deleteAllData();
                     Alert.alert('Data Deleted', 'All data has been permanently deleted.');
                   },
                 },
@@ -207,18 +188,18 @@ export default function SettingsScreen() {
   const getSyncStatusColor = (): string => {
     switch (syncStatus) {
       case 'syncing':
-        return '#007AFF';
+        return COLORS.primary;
       case 'success':
-        return '#34C759';
+        return COLORS.success;
       case 'error':
-        return '#FF3B30';
+        return COLORS.error;
       default:
-        return pendingChanges > 0 ? '#FF9500' : '#34C759';
+        return pendingChanges > 0 ? COLORS.warning : COLORS.success;
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Account Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
@@ -241,24 +222,24 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        <TouchableOpacity
+        <Pressable
           style={styles.signOutButton}
           onPress={handleSignOut}
           disabled={isSigningOut || authLoading}
         >
           {isSigningOut ? (
-            <ActivityIndicator color="#FF3B30" />
+            <ActivityIndicator color={COLORS.error} />
           ) : (
             <Text style={styles.signOutButtonText}>Sign Out</Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {/* Sync Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Cloud Sync</Text>
 
-        <View style={styles.syncStatusRow}>
+        <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingLabel}>Status</Text>
             <View style={styles.syncStatusContainer}>
@@ -275,17 +256,38 @@ export default function SettingsScreen() {
           <Text style={styles.aboutValue}>{formatLastSynced(lastSyncedAt)}</Text>
         </View>
 
-        <TouchableOpacity
+        <Pressable
           style={[styles.syncButton, syncStatus === 'syncing' && styles.syncButtonDisabled]}
           onPress={handleSyncNow}
           disabled={syncStatus === 'syncing'}
         >
           {syncStatus === 'syncing' ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
+            <ActivityIndicator color={COLORS.white} size="small" />
           ) : (
             <Text style={styles.syncButtonText}>Sync Now</Text>
           )}
-        </TouchableOpacity>
+        </Pressable>
+      </View>
+
+      {/* Data Management Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Data Management</Text>
+
+        <Pressable style={styles.menuItem} onPress={() => router.push('/settings/import')}>
+          <View style={styles.menuItemContent}>
+            <Ionicons name="download-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.menuItemText}>Import Statement</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        </Pressable>
+
+        <Pressable style={styles.menuItem} onPress={() => router.push('/settings/export')}>
+          <View style={styles.menuItemContent}>
+            <Ionicons name="share-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.menuItemText}>Export Data</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        </Pressable>
       </View>
 
       {/* Notifications Section */}
@@ -302,8 +304,8 @@ export default function SettingsScreen() {
           <Switch
             value={reminderEnabled}
             onValueChange={handleToggleReminder}
-            trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-            thumbColor="#FFFFFF"
+            trackColor={{ false: COLORS.gray300, true: COLORS.success }}
+            thumbColor={COLORS.white}
           />
         </View>
 
@@ -315,12 +317,9 @@ export default function SettingsScreen() {
                 {formatTime(reminderTime.getHours(), reminderTime.getMinutes())}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.timeButton}
-              onPress={() => setShowTimePicker(true)}
-            >
+            <Pressable style={styles.timeButton} onPress={() => setShowTimePicker(true)}>
               <Text style={styles.timeButtonText}>Change</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
 
@@ -333,20 +332,14 @@ export default function SettingsScreen() {
             onChange={handleTimeChange}
           />
         )}
-
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={handleTestNotification}
-        >
-          <Text style={styles.testButtonText}>Send Test Notification</Text>
-        </TouchableOpacity>
       </View>
 
+      {/* About Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.aboutRow}>
           <Text style={styles.aboutLabel}>Version</Text>
-          <Text style={styles.aboutValue}>1.0.0</Text>
+          <Text style={styles.aboutValue}>2.0.0</Text>
         </View>
         <View style={styles.aboutRow}>
           <Text style={styles.aboutLabel}>Package</Text>
@@ -354,14 +347,12 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* Danger Zone */}
       <View style={styles.dangerSection}>
         <Text style={styles.dangerSectionTitle}>Danger Zone</Text>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={handleDeleteAllData}
-        >
+        <Pressable style={styles.deleteButton} onPress={handleDeleteAllData}>
           <Text style={styles.deleteButtonText}>DELETE ALL DATA</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -370,27 +361,28 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
+  },
+  content: {
+    paddingBottom: Spacing.xxxl,
   },
   section: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 20,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COLORS.surface,
+    marginTop: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 16,
+    ...Typography.title3,
+    marginBottom: Spacing.lg,
   },
   accountInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 16,
+    paddingBottom: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: COLORS.border,
   },
   avatar: {
     width: 56,
@@ -401,166 +393,153 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#007AFF',
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 24,
     fontWeight: '600',
   },
   accountDetails: {
-    marginLeft: 16,
+    marginLeft: Spacing.lg,
     flex: 1,
   },
   userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
+    ...Typography.bodyBold,
   },
   userEmail: {
-    fontSize: 14,
-    color: '#8E8E93',
+    ...Typography.footnote,
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
   signOutButton: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 8,
+    marginTop: Spacing.lg,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: COLORS.error,
     alignItems: 'center',
   },
   signOutButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  syncStatusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  syncStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  syncStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  syncStatusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  syncButton: {
-    backgroundColor: '#007AFF',
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  syncButtonDisabled: {
-    backgroundColor: '#A0C4FF',
-  },
-  syncButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    ...Typography.bodyBold,
+    color: COLORS.error,
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: COLORS.borderLight,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: Spacing.lg,
   },
   settingLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
+    ...Typography.body,
   },
   settingDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
+    ...Typography.footnote,
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
-  timeButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+  syncStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
   },
-  timeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+  syncStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: Spacing.sm,
   },
-  testButton: {
-    backgroundColor: '#F2F2F7',
-    padding: 14,
-    borderRadius: 8,
-    marginTop: 16,
+  syncStatusText: {
+    ...Typography.footnote,
+    fontWeight: '500',
+  },
+  syncButton: {
+    backgroundColor: COLORS.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    marginTop: Spacing.lg,
     alignItems: 'center',
   },
-  testButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '500',
+  syncButtonDisabled: {
+    backgroundColor: COLORS.primary + '80',
+  },
+  syncButtonText: {
+    ...Typography.bodyBold,
+    color: COLORS.white,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  menuItemText: {
+    ...Typography.body,
+  },
+  timeButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  timeButtonText: {
+    ...Typography.footnote,
+    color: COLORS.white,
+    fontWeight: '600',
   },
   aboutRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: COLORS.borderLight,
   },
   aboutLabel: {
-    fontSize: 16,
-    color: '#000000',
+    ...Typography.body,
   },
   aboutValue: {
-    fontSize: 16,
-    color: '#8E8E93',
+    ...Typography.body,
+    color: COLORS.textSecondary,
   },
   dangerSection: {
-    backgroundColor: '#FFFFFF',
-    marginTop: 20,
-    marginHorizontal: 16,
-    marginBottom: 40,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COLORS.surface,
+    marginTop: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: COLORS.error,
   },
   dangerSectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FF3B30',
-    marginBottom: 16,
+    ...Typography.title3,
+    color: COLORS.error,
+    marginBottom: Spacing.lg,
   },
   deleteButton: {
-    backgroundColor: '#FF3B30',
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: COLORS.error,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.sm,
     alignItems: 'center',
   },
   deleteButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    ...Typography.bodyBold,
+    color: COLORS.white,
     letterSpacing: 1,
   },
 });

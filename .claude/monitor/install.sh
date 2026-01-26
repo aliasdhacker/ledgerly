@@ -14,8 +14,8 @@ mkdir -p "$DEST"
 mkdir -p "$DEST/queue"
 
 # Copy files
-cp monitor.sh "$DEST/"
-cp dashboard.sh "$DEST/"
+cp ~/.claude/monitor.sh "$DEST/"
+cp ~/.claude/monitor/dashboard.sh "$DEST/"
 chmod +x "$DEST/monitor.sh" "$DEST/dashboard.sh"
 
 # Backup existing settings
@@ -30,7 +30,7 @@ cat > "$SETTINGS" << 'EOF'
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "(?i)(edit|write|create|str_replace|file_create)",
+        "matcher": "(?i)(edit|write|create|file_write|file_create|file|replace|modify|str_replace|posttooluse|post_tool_use|tool_use|postToolUse)",
         "command": ["bash", "$HOME/.claude/monitor/monitor.sh"]
       }
     ]
@@ -48,7 +48,7 @@ echo "Next steps:"
 echo ""
 echo "1. Add to ~/.zshrc:"
 echo "   export CLAUDE_MONITOR_MODE=\"review\""
-echo "   export OLLAMA_HOST=\"localhost:11434\""
+echo "   export OLLAMA_HOST=\"http://192.168.98.108:11434\""
 echo "   export OLLAMA_MODEL=\"llama3.2\""
 echo "   alias claude-dash=\"bash ~/.claude/monitor/dashboard.sh\""
 echo ""

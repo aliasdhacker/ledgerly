@@ -16,7 +16,7 @@ export interface CategoryBreakdown {
 export interface AccountBreakdown {
   accountId: string;
   accountName: string;
-  accountType: 'bank' | 'credit';
+  accountType: 'bank' | 'credit' | 'loan';
   inflow: number;
   outflow: number;
   net: number;

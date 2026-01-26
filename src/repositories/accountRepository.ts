@@ -76,6 +76,15 @@ export const AccountRepository = {
       minimumPayment: data.minimumPayment,
       paymentDueDay: data.paymentDueDay,
       apr: data.apr,
+      // Loan fields
+      loanPrincipal: data.loanPrincipal,
+      loanInterestRate: data.loanInterestRate,
+      loanMonthlyPayment: data.loanMonthlyPayment,
+      loanStartDate: data.loanStartDate,
+      loanEndDate: data.loanEndDate,
+      loanPaymentFrequency: data.loanPaymentFrequency,
+      loanPaymentDay: data.loanPaymentDay,
+      linkedPayableId: data.linkedPayableId,
       syncStatus: 'dirty',
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -197,6 +206,7 @@ export const AccountRepository = {
   getNetWorth(): number {
     const bankTotal = this.getTotalBalance('bank');
     const creditTotal = this.getTotalBalance('credit');
-    return bankTotal - creditTotal;
+    const loanTotal = this.getTotalBalance('loan');
+    return bankTotal - creditTotal - loanTotal;
   },
 };

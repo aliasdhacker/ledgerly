@@ -5,10 +5,13 @@
 set -e
 
 # Configuration
+# Allow callers to set OLLAMA_HOST as either "host:port" or a full URL (http://host:port)
 OLLAMA_HOST_RAW="${OLLAMA_HOST:-localhost:11434}"
-# Strip http:// or https:// if present
-OLLAMA_HOST="${OLLAMA_HOST_RAW#http://}"
-OLLAMA_HOST="${OLLAMA_HOST#https://}"
+if [[ "$OLLAMA_HOST_RAW" =~ ^https?:// ]]; then
+  OLLAMA_URL="$OLLAMA_HOST_RAW"
+else
+  OLLAMA_URL="http://$OLLAMA_HOST_RAW"
+fi
 OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1:8b}"
 MONITOR_DIR="$HOME/.claude/monitor"
 LOG_FILE="$MONITOR_DIR/reviews.log"
@@ -21,6 +24,10 @@ mkdir -p "$QUEUE_DIR"
 
 # Read hook input from stdin
 INPUT=$(cat)
+
+# Write raw input for debugging (helpful when hooks appear not to run)
+mkdir -p "$MONITOR_DIR"
+echo "$INPUT" > "$MONITOR_DIR/last_input.json" || true
 
 # Exit if no input
 if [ -z "$INPUT" ]; then
@@ -48,9 +55,9 @@ TASK: Review this code change and respond with a JSON object.
 Tool: $TOOL_NAME
 File: $FILE_PATH
 Content:
-\`\`\`
+\`\`\`\
 $CONTENT
-\`\`\`
+\`\`\`\
 
 Evaluate for:
 1. Security issues (credentials, injection, unsafe operations)
@@ -71,11 +78,19 @@ Respond ONLY with this JSON format:
     --arg prompt "$prompt" \
     '{model: $model, prompt: $prompt, stream: false, format: "json"}')
 
-  local response=$(curl -s --max-time 30 "http://$OLLAMA_HOST/api/generate" \
+  # Use computed OLLAMA_URL (handles full URLs and host:port)
+  local response
+  response=$(curl -s --max-time 30 "$OLLAMA_URL/api/generate" \
     -H "Content-Type: application/json" \
-    -d "$payload" 2>/dev/null)
+    -d "$payload" 2>/dev/null) || response=""
 
-  echo "$response" | jq -r '.response // "{\"safe\":true,\"severity\":\"ok\",\"issues\":[],\"summary\":\"Ollama unavailable\"}"'
+  if [ -z "$response" ]; then
+    echo "{\"safe\":true,\"severity\":\"ok\",\"issues\":[],\"summary\":\"Ollama unavailable\"}"
+    return
+  fi
+
+  # When Ollama returns a structured object it may be under .response or top-level
+  echo "$response" | jq -r '.response // . // "{\"safe\":true,\"severity\":\"ok\",\"issues\":[],\"summary\":\"Ollama response parse error\"}"'
 }
 
 # Main logic based on mode

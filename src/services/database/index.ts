@@ -58,11 +58,11 @@ const SCHEMA_V1 = `
     updated_at TEXT NOT NULL
   );
 
-  -- Accounts (bank + credit)
+  -- Accounts (bank, credit, loan)
   CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('bank', 'credit')),
+    type TEXT NOT NULL CHECK (type IN ('bank', 'credit', 'loan')),
     balance REAL NOT NULL DEFAULT 0,
     currency TEXT NOT NULL DEFAULT 'USD',
     institution_name TEXT,

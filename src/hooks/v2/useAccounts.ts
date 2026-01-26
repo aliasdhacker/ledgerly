@@ -4,7 +4,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { AccountService } from '../../services/v2';
 import type { Account, AccountCreate, AccountUpdate, AccountWithComputed, AccountType } from '../../types/account';
-import type { AccountSummary, CreditAccountInfo } from '../../services/v2/AccountService';
+import type { AccountSummary, CreditAccountInfo, LoanAccountInfo } from '../../services/v2/AccountService';
 
 interface UseAccountsState {
   accounts: AccountWithComputed[];
@@ -19,6 +19,8 @@ interface UseAccountsReturn extends UseAccountsState {
   getBankAccounts: () => AccountWithComputed[];
   getCreditAccounts: () => AccountWithComputed[];
   getCreditAccountsInfo: () => CreditAccountInfo[];
+  getLoanAccounts: () => AccountWithComputed[];
+  getLoanAccountsInfo: () => LoanAccountInfo[];
   create: (data: AccountCreate) => { success: boolean; data?: Account; errors?: string[] };
   update: (id: string, data: AccountUpdate) => { success: boolean; data?: Account; errors?: string[] };
   remove: (id: string) => { success: boolean; errors?: string[] };
@@ -68,6 +70,14 @@ export function useAccounts(options: { type?: AccountType; activeOnly?: boolean 
     return AccountService.getCreditAccountsInfo();
   }, []);
 
+  const getLoanAccounts = useCallback(() => {
+    return AccountService.getLoanAccounts();
+  }, []);
+
+  const getLoanAccountsInfo = useCallback(() => {
+    return AccountService.getLoanAccountsInfo();
+  }, []);
+
   const create = useCallback((data: AccountCreate) => {
     const result = AccountService.create(data);
     if (result.success) {
@@ -107,6 +117,8 @@ export function useAccounts(options: { type?: AccountType; activeOnly?: boolean 
     getBankAccounts,
     getCreditAccounts,
     getCreditAccountsInfo,
+    getLoanAccounts,
+    getLoanAccountsInfo,
     create,
     update,
     remove,

@@ -1,491 +1,371 @@
-import { useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import {
-  StyleSheet,
-  Text,
   View,
-  TouchableOpacity,
+  Text,
   ScrollView,
-  Modal,
-  FlatList,
+  StyleSheet,
+  Pressable,
+  RefreshControl,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { DatabaseService } from '../../src/services/DatabaseService';
-import { Bill, Debt } from '../../src/types';
+import { COLORS, Typography, Spacing, BorderRadius } from '../../src/constants';
+import { MoneyText, Card, LoadingSpinner } from '../../src/components';
+import { PayableCard } from '../../src/components/payables';
+import { TransactionCard } from '../../src/components/transactions';
+import {
+  useDraft,
+  useFinancialOverview,
+  useUpcomingPayables,
+  useRecentTransactions,
+} from '../../src/hooks/v2';
 
-export default function DraftScreen() {
-  const [runningBalance, setRunningBalance] = useState(0);
-  const [bills, setBills] = useState<Bill[]>([]);
-  const [pendingTotal, setPendingTotal] = useState(0);
-  const [paidWeekTotal, setPaidWeekTotal] = useState(0);
-  const [totalDebt, setTotalDebt] = useState(0);
-  const [unpaidBillsModalVisible, setUnpaidBillsModalVisible] = useState(false);
-  const [upcomingDebtPayments, setUpcomingDebtPayments] = useState<Debt[]>([]);
-  const [upcomingDebtTotal, setUpcomingDebtTotal] = useState(0);
+export default function HomeScreen() {
+  const router = useRouter();
+  const { draft, loading: draftLoading, refresh: refreshDraft } = useDraft();
+  const overview = useFinancialOverview();
+  const { payables: upcomingPayables, total: upcomingTotal, loading: payablesLoading } = useUpcomingPayables(14);
+  const { transactions: recentTransactions, loading: transactionsLoading } = useRecentTransactions(5);
 
-  const loadData = useCallback(() => {
-    DatabaseService.init();
-
-    // Get running balance from all transactions
-    const balance = DatabaseService.getRunningBalance();
-    setRunningBalance(balance);
-
-    // Get bills for display
-    const loadedBills = DatabaseService.getBillsForCurrentMonth();
-    setBills(loadedBills);
-
-    const unpaidSum = loadedBills
-      .filter((b) => !b.isPaid)
-      .reduce((sum, b) => sum + b.amount, 0);
-    setPendingTotal(unpaidSum);
-
-    // Get bills paid this week
-    const paidThisWeek = DatabaseService.getBillsPaidThisWeek();
-    const paidWeekSum = paidThisWeek.reduce((sum, b) => sum + b.amount, 0);
-    setPaidWeekTotal(paidWeekSum);
-
-    // Get total debt
-    const debt = DatabaseService.getTotalDebt();
-    setTotalDebt(debt);
-
-    // Get recurring debt payments due within 14 days
-    const upcomingDebts = DatabaseService.getRecurringDebtsDueWithin(14);
-    setUpcomingDebtPayments(upcomingDebts);
-    const debtPaymentTotal = DatabaseService.getUpcomingDebtPaymentsTotal(14);
-    setUpcomingDebtTotal(debtPaymentTotal);
-  }, []);
+  const loading = draftLoading || overview.loading || payablesLoading || transactionsLoading;
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData])
+      refreshDraft();
+    }, [refreshDraft])
   );
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  const safeToSpend = draft?.safeToSpend ?? 0;
+  const isNegative = safeToSpend < 0;
 
-  const formatDateShort = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const unpaidBills = bills.filter((b) => !b.isPaid);
-  const unpaidCount = unpaidBills.length;
-  const upcomingDebtCount = upcomingDebtPayments.length;
-  const totalUpcomingCount = unpaidCount + upcomingDebtCount;
-  const totalUpcomingAmount = pendingTotal + upcomingDebtTotal;
-
-  // Safe to spend = running balance - unpaid bills - upcoming debt payments
-  const safeToSpend = runningBalance - totalUpcomingAmount;
+  if (loading && !draft) {
+    return (
+      <View style={styles.loadingContainer}>
+        <LoadingSpinner />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>The Draft</Text>
-          <Text style={styles.subtitle}>Your financial snapshot</Text>
-        </View>
-
-        <View style={[
-          styles.balanceCard,
-          runningBalance < 0 && styles.balanceCardNegative
-        ]}>
-          <Text style={styles.balanceLabel}>Running Balance</Text>
-          <Text style={styles.balanceAmount}>
-            {formatCurrency(runningBalance)}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={loading} onRefresh={refreshDraft} />
+      }
+    >
+      {/* Safe to Spend Card */}
+      <Card style={styles.safeToSpendCard} variant="elevated">
+        <Text style={styles.safeToSpendLabel}>Safe to Spend</Text>
+        <MoneyText
+          amount={safeToSpend}
+          size="xlarge"
+          colorize
+          style={isNegative ? styles.negative : undefined}
+        />
+        {draft && draft.upcomingPayables > 0 && (
+          <Text style={styles.safeToSpendHint}>
+            After {draft.breakdown.upcomingBills.length} upcoming bill{draft.breakdown.upcomingBills.length !== 1 ? 's' : ''}
           </Text>
-          <Text style={styles.balanceNote}>From all transactions</Text>
-        </View>
+        )}
+      </Card>
 
-        <View style={styles.summaryCard}>
-          <TouchableOpacity
-            style={styles.summaryRow}
-            onPress={() => setUnpaidBillsModalVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.summaryLabel}>Upcoming ({totalUpcomingCount})</Text>
-            <View style={styles.summaryRight}>
-              <Text style={[styles.summaryValue, styles.textPending]}>
-                {formatCurrency(totalUpcomingAmount)}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color="#8E8E93" />
-            </View>
-          </TouchableOpacity>
-          <View style={styles.divider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Paid This Week</Text>
-            <Text style={[styles.summaryValue, styles.textPaid]}>
-              {formatCurrency(paidWeekTotal)}
-            </Text>
-          </View>
-        </View>
+      {/* Financial Overview */}
+      <View style={styles.overviewGrid}>
+        <Card style={styles.overviewCard} onPress={() => router.push('/accounts')}>
+          <Text style={styles.overviewLabel}>Available</Text>
+          <MoneyText amount={overview.availableBalance} size="large" />
+        </Card>
+        <Card style={styles.overviewCard} onPress={() => router.push('/accounts')}>
+          <Text style={styles.overviewLabel}>Credit Debt</Text>
+          <MoneyText
+            amount={overview.creditDebt}
+            size="large"
+            style={overview.creditDebt > 0 ? styles.debtAmount : undefined}
+          />
+        </Card>
+      </View>
 
-        <View
-          style={[
-            styles.resultCard,
-            safeToSpend >= 0 ? styles.resultPositive : styles.resultNegative,
-          ]}
+      <Card style={styles.netWorthCard}>
+        <View style={styles.netWorthRow}>
+          <Text style={styles.netWorthLabel}>Net Worth</Text>
+          <MoneyText amount={overview.netWorth} size="large" colorize />
+        </View>
+      </Card>
+
+      {/* Upcoming Payables */}
+      <View style={styles.section}>
+        <Pressable
+          style={styles.sectionHeader}
+          onPress={() => router.push('/payables')}
         >
-          <Text style={styles.resultLabel}>Safe to Spend</Text>
-          <Text
-            style={[
-              styles.resultAmount,
-              safeToSpend >= 0 ? styles.textPositive : styles.textNegativeResult,
-            ]}
-          >
-            {formatCurrency(safeToSpend)}
-          </Text>
-          <Text style={styles.resultNote}>Balance minus upcoming payments</Text>
-        </View>
-
-        <View style={styles.debtCard}>
-          <Text style={styles.debtLabel}>Debt Snapshot</Text>
-          <Text style={styles.debtAmount}>{formatCurrency(totalDebt)}</Text>
-          <Text style={styles.debtNote}>Total across all debt accounts</Text>
-        </View>
-      </ScrollView>
-
-      {/* Unpaid Bills Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={unpaidBillsModalVisible}
-        onRequestClose={() => setUnpaidBillsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Upcoming Payments</Text>
-              <TouchableOpacity
-                onPress={() => setUnpaidBillsModalVisible(false)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Ionicons name="close-circle" size={28} color="#8E8E93" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalTotalCard}>
-              <Text style={styles.modalTotalLabel}>Total Due</Text>
-              <Text style={styles.modalTotalAmount}>
-                {formatCurrency(totalUpcomingAmount)}
-              </Text>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.modalList}>
-              {/* Unpaid Bills Section */}
-              {unpaidBills.length > 0 && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Bills ({unpaidCount})</Text>
-                  {unpaidBills.map((item) => (
-                    <View key={item.id} style={styles.modalBillRow}>
-                      <View>
-                        <Text style={styles.modalBillName}>{item.name}</Text>
-                        <Text style={styles.modalBillDue}>Due on the {item.dueDay}th</Text>
-                      </View>
-                      <Text style={styles.modalBillAmount}>
-                        {formatCurrency(item.amount)}
-                      </Text>
-                    </View>
-                  ))}
-                </>
-              )}
-
-              {/* Debt Payments Section */}
-              {upcomingDebtPayments.length > 0 && (
-                <>
-                  <Text style={styles.modalSectionTitle}>Debt Payments ({upcomingDebtCount})</Text>
-                  {upcomingDebtPayments.map((item) => (
-                    <View key={item.id} style={styles.modalDebtRow}>
-                      <View>
-                        <Text style={styles.modalBillName}>{item.company}</Text>
-                        <Text style={styles.modalBillDue}>
-                          Due {item.nextPaymentDate ? formatDateShort(item.nextPaymentDate) : 'soon'}
-                        </Text>
-                      </View>
-                      <View style={styles.modalDebtAmounts}>
-                        {item.minimumPayment && (
-                          <Text style={styles.modalDebtPayment}>
-                            {formatCurrency(item.minimumPayment)}
-                          </Text>
-                        )}
-                        <Text style={styles.modalDebtBalance}>
-                          Bal: {formatCurrency(item.balance)}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-                </>
-              )}
-
-              {unpaidBills.length === 0 && upcomingDebtPayments.length === 0 && (
-                <Text style={styles.modalEmpty}>No upcoming payments</Text>
-              )}
-            </ScrollView>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Upcoming</Text>
+            {upcomingPayables.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{upcomingPayables.length}</Text>
+              </View>
+            )}
           </View>
-        </View>
-      </Modal>
-    </View>
+          <View style={styles.sectionRight}>
+            <MoneyText amount={upcomingTotal} size="medium" style={styles.sectionTotal} />
+            <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+          </View>
+        </Pressable>
+
+        {upcomingPayables.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Ionicons name="checkmark-circle" size={32} color={COLORS.success} />
+            <Text style={styles.emptyText}>No upcoming bills</Text>
+          </Card>
+        ) : (
+          upcomingPayables.slice(0, 3).map((payable) => (
+            <PayableCard
+              key={payable.id}
+              payable={payable}
+              onPress={() => router.push(`/payables/${payable.id}`)}
+            />
+          ))
+        )}
+
+        {upcomingPayables.length > 3 && (
+          <Pressable
+            style={styles.seeAllButton}
+            onPress={() => router.push('/payables')}
+          >
+            <Text style={styles.seeAllText}>
+              See all {upcomingPayables.length} payables
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+          </Pressable>
+        )}
+      </View>
+
+      {/* Recent Transactions */}
+      <View style={styles.section}>
+        <Pressable
+          style={styles.sectionHeader}
+          onPress={() => router.push('/accounts')}
+        >
+          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        </Pressable>
+
+        {recentTransactions.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Ionicons name="receipt-outline" size={32} color={COLORS.textSecondary} />
+            <Text style={styles.emptyText}>No transactions yet</Text>
+          </Card>
+        ) : (
+          <Card padding="none">
+            {recentTransactions.map((transaction) => (
+              <TransactionCard
+                key={transaction.id}
+                transaction={transaction}
+                onPress={() => router.push(`/accounts/${transaction.accountId}`)}
+              />
+            ))}
+          </Card>
+        )}
+      </View>
+
+      {/* Quick Actions */}
+      <View style={styles.quickActions}>
+        <Pressable
+          style={styles.quickActionButton}
+          onPress={() => router.push('/accounts/transfer')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: COLORS.primary + '20' }]}>
+            <Ionicons name="swap-horizontal" size={24} color={COLORS.primary} />
+          </View>
+          <Text style={styles.quickActionLabel}>Transfer</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.quickActionButton}
+          onPress={() => router.push('/payables/add')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: COLORS.warning + '20' }]}>
+            <Ionicons name="add-circle" size={24} color={COLORS.warning} />
+          </View>
+          <Text style={styles.quickActionLabel}>Add Bill</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.quickActionButton}
+          onPress={() => router.push('/trends')}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: COLORS.success + '20' }]}>
+            <Ionicons name="trending-up" size={24} color={COLORS.success} />
+          </View>
+          <Text style={styles.quickActionLabel}>Trends</Text>
+        </Pressable>
+      </View>
+
+      {/* Settings Link */}
+      <Pressable
+        style={styles.settingsLink}
+        onPress={() => router.push('/settings')}
+      >
+        <Ionicons name="settings-outline" size={20} color={COLORS.textSecondary} />
+        <Text style={styles.settingsText}>Settings</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: COLORS.background,
   },
-  scrollContent: {
-    padding: 20,
+  content: {
+    padding: Spacing.xl,
+    paddingBottom: Spacing.xxxl,
   },
-  header: {
-    marginBottom: 30,
-    marginTop: 10,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  subtitle: {
-    fontSize: 17,
-    color: '#8E8E93',
-    marginTop: 4,
-  },
-  balanceCard: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 24,
+  loadingContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+    backgroundColor: COLORS.background,
   },
-  balanceCardNegative: {
-    backgroundColor: '#FF3B30',
+  safeToSpendCard: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl,
+    marginBottom: Spacing.lg,
   },
-  balanceLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textTransform: 'uppercase',
-    marginBottom: 4,
+  safeToSpendLabel: {
+    ...Typography.subhead,
+    marginBottom: Spacing.sm,
   },
-  balanceAmount: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#FFF',
+  safeToSpendAmount: {
+    marginBottom: Spacing.xs,
   },
-  balanceNote: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
+  safeToSpendHint: {
+    ...Typography.caption,
+    color: COLORS.textSecondary,
   },
-  summaryCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+  negative: {
+    color: COLORS.error,
   },
-  summaryRow: {
+  overviewGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
   },
-  summaryRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  overviewCard: {
+    flex: 1,
+    padding: Spacing.lg,
   },
-  summaryLabel: {
-    fontSize: 17,
-    color: '#8E8E93',
-  },
-  summaryValue: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-  },
-  textPending: {
-    color: '#FF3B30',
-  },
-  textPaid: {
-    color: '#34C759',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E5EA',
-    marginVertical: 8,
-  },
-  resultCard: {
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-  },
-  resultPositive: {
-    backgroundColor: '#D4EDDA',
-  },
-  resultNegative: {
-    backgroundColor: '#F8D7DA',
-  },
-  resultLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  resultAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  textPositive: {
-    color: '#155724',
-  },
-  textNegativeResult: {
-    color: '#721C24',
-  },
-  resultNote: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginTop: 8,
-  },
-  debtCard: {
-    backgroundColor: '#8E8E93',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  debtLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textTransform: 'uppercase',
-    marginBottom: 4,
+  overviewLabel: {
+    ...Typography.caption,
+    color: COLORS.textSecondary,
+    marginBottom: Spacing.xs,
   },
   debtAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
+    color: COLORS.expense,
   },
-  debtNote: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 4,
+  netWorthCard: {
+    marginBottom: Spacing.xl,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#F2F2F7',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 34,
-  },
-  modalHeader: {
+  netWorthRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000',
+  netWorthLabel: {
+    ...Typography.body,
+    color: COLORS.textSecondary,
   },
-  modalTotalCard: {
-    backgroundColor: '#FF3B30',
-    margin: 20,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
+  section: {
+    marginBottom: Spacing.xl,
   },
-  modalTotalLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  modalTotalAmount: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  modalList: {
-    paddingHorizontal: 20,
-  },
-  modalBillRow: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
-  modalBillName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000',
-  },
-  modalBillDue: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginTop: 2,
-  },
-  modalBillAmount: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#FF3B30',
-  },
-  modalEmpty: {
-    textAlign: 'center',
-    color: '#8E8E93',
-    fontSize: 17,
-    paddingVertical: 20,
-  },
-  modalSectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    marginBottom: 10,
-    marginTop: 10,
-  },
-  modalDebtRow: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
+  sectionTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9500',
   },
-  modalDebtAmounts: {
-    alignItems: 'flex-end',
+  sectionTitle: {
+    ...Typography.title3,
   },
-  modalDebtPayment: {
-    fontSize: 17,
+  badge: {
+    backgroundColor: COLORS.primary,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginLeft: Spacing.sm,
+  },
+  badgeText: {
+    ...Typography.caption,
+    color: COLORS.white,
     fontWeight: '600',
-    color: '#FF9500',
   },
-  modalDebtBalance: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
+  sectionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sectionTotal: {
+    marginRight: Spacing.xs,
+    color: COLORS.textSecondary,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.xxl,
+  },
+  emptyText: {
+    ...Typography.subhead,
+    color: COLORS.textSecondary,
+    marginTop: Spacing.sm,
+  },
+  seeAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  seeAllText: {
+    ...Typography.footnote,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginRight: Spacing.xs,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  quickActionButton: {
+    alignItems: 'center',
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  quickActionLabel: {
+    ...Typography.caption,
+    color: COLORS.textSecondary,
+  },
+  settingsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+  },
+  settingsText: {
+    ...Typography.footnote,
+    color: COLORS.textSecondary,
+    marginLeft: Spacing.sm,
   },
 });

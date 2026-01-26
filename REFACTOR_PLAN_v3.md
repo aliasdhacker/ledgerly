@@ -471,7 +471,7 @@ Settings
 CREATE TABLE accounts (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('bank', 'credit')),
+  type TEXT NOT NULL CHECK (type IN ('bank', 'credit', 'loan')),
   balance REAL NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'USD',
   institution_name TEXT,

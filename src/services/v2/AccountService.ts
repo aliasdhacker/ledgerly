@@ -1,18 +1,26 @@
 // Account Service for DriftMoney
 // Business logic layer for account operations
 
-import { AccountRepository } from '../../repositories';
+import { AccountRepository, PayableRepository } from '../../repositories';
 import { validateAccountCreate, validateAccountUpdate } from '../../validation';
 import type { Account, AccountCreate, AccountUpdate, AccountWithComputed, AccountType } from '../../types/account';
-import type { ServiceResult } from '../../types/common';
+import type { ServiceResult, RecurrenceFrequency } from '../../types/common';
 import { success, failure } from '../../types/common';
 
 export interface AccountSummary {
   totalBankBalance: number;
   totalCreditBalance: number;
+  totalLoanBalance: number;
   netWorth: number;
   accountCount: number;
   activeAccountCount: number;
+}
+
+export interface LoanAccountInfo {
+  account: AccountWithComputed;
+  percentPaid: number;
+  remainingBalance: number;
+  principalPaid: number;
 }
 
 export interface CreditAccountInfo {
@@ -46,14 +54,74 @@ export const AccountService = {
     return this.getAll({ type: 'credit', activeOnly });
   },
 
+  getLoanAccounts(activeOnly = true): AccountWithComputed[] {
+    return this.getAll({ type: 'loan', activeOnly });
+  },
+
   create(data: AccountCreate): ServiceResult<Account> {
     const validation = validateAccountCreate(data);
     if (!validation.success) {
       return failure(Object.values(validation.errors));
     }
 
+    // For loan accounts, auto-create a recurring payable for payments
+    if (data.type === 'loan' && data.loanMonthlyPayment && data.loanPaymentFrequency) {
+      const payable = PayableRepository.create({
+        name: `${data.name} Payment`,
+        amount: data.loanMonthlyPayment,
+        dueDate: this.calculateNextPaymentDate(data.loanPaymentFrequency, data.loanPaymentDay),
+        isRecurring: true,
+        recurrenceRule: {
+          frequency: data.loanPaymentFrequency,
+          interval: 1,
+          dayOfMonth: data.loanPaymentDay,
+        },
+        notes: `Auto-generated payment for ${data.name}`,
+      });
+
+      // Create the account with the linked payable
+      const account = AccountRepository.create({
+        ...data,
+        linkedPayableId: payable.id,
+      });
+      return success(account);
+    }
+
     const account = AccountRepository.create(data);
     return success(account);
+  },
+
+  /**
+   * Calculate the next payment date based on frequency and day
+   */
+  calculateNextPaymentDate(frequency: RecurrenceFrequency, paymentDay?: number): string {
+    const today = new Date();
+    const day = paymentDay || today.getDate();
+
+    // For monthly, set to the payment day this month or next
+    if (frequency === 'monthly' || frequency === 'biweekly') {
+      const targetDate = new Date(today.getFullYear(), today.getMonth(), day);
+      if (targetDate <= today) {
+        targetDate.setMonth(targetDate.getMonth() + 1);
+      }
+      return targetDate.toISOString().split('T')[0];
+    }
+
+    // For weekly, find the next occurrence of that day of week
+    if (frequency === 'weekly') {
+      const targetDay = (paymentDay || 1) % 7; // 0-6
+      const currentDay = today.getDay();
+      let daysUntil = targetDay - currentDay;
+      if (daysUntil <= 0) daysUntil += 7;
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + daysUntil);
+      return targetDate.toISOString().split('T')[0];
+    }
+
+    // Default: tomorrow
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
   },
 
   update(id: string, data: AccountUpdate): ServiceResult<Account> {
@@ -111,14 +179,39 @@ export const AccountService = {
   getSummary(): AccountSummary {
     const allAccounts = AccountRepository.findAll();
     const activeAccounts = allAccounts.filter((a) => a.isActive);
+    const totalLoanBalance = AccountRepository.getTotalBalance('loan');
 
     return {
       totalBankBalance: AccountRepository.getTotalBalance('bank'),
       totalCreditBalance: AccountRepository.getTotalBalance('credit'),
-      netWorth: AccountRepository.getNetWorth(),
+      totalLoanBalance,
+      netWorth: AccountRepository.getNetWorth() - totalLoanBalance,
       accountCount: allAccounts.length,
       activeAccountCount: activeAccounts.length,
     };
+  },
+
+  getLoanAccountsInfo(): LoanAccountInfo[] {
+    const loanAccounts = this.getLoanAccounts();
+
+    return loanAccounts.map((account) => {
+      const principal = account.loanPrincipal ?? 0;
+      const remainingBalance = account.balance;
+      const principalPaid = Math.max(0, principal - remainingBalance);
+      const percentPaid = principal > 0 ? Math.round((principalPaid / principal) * 100) : 0;
+
+      return {
+        account,
+        percentPaid,
+        remainingBalance,
+        principalPaid,
+      };
+    });
+  },
+
+  getTotalLoanBalance(): number {
+    const loanAccounts = this.getLoanAccounts();
+    return loanAccounts.reduce((total, acc) => total + acc.balance, 0);
   },
 
   getCreditAccountsInfo(): CreditAccountInfo[] {
@@ -178,6 +271,15 @@ export const AccountService = {
     if (account.type === 'credit' && account.paymentDueDay !== undefined) {
       const today = new Date().getDate();
       computed.isOverdue = account.balance > 0 && today > account.paymentDueDay;
+    }
+
+    if (account.type === 'loan') {
+      const principal = account.loanPrincipal ?? 0;
+      computed.loanRemainingBalance = account.balance;
+      computed.loanPrincipalPaid = Math.max(0, principal - account.balance);
+      computed.loanPercentPaid = principal > 0
+        ? Math.round((computed.loanPrincipalPaid / principal) * 100)
+        : 0;
     }
 
     return computed;

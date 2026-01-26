@@ -23,12 +23,18 @@ const mapSupabaseUser = (supabaseUser: any): User | null => {
 };
 
 // Helper to map Supabase session to our Session type
-const mapSupabaseSession = (supabaseSession: any): Session | null => {
+const mapSupabaseSession = (supabaseSession: any, supabaseUser?: any): Session | null => {
   if (!supabaseSession) return null;
+  const user = supabaseUser || supabaseSession.user;
   return {
     accessToken: supabaseSession.access_token,
     refreshToken: supabaseSession.refresh_token,
     expiresAt: supabaseSession.expires_at || 0,
+    user: mapSupabaseUser(user) || {
+      id: '',
+      email: '',
+      createdAt: new Date().toISOString(),
+    },
   };
 };
 
@@ -123,8 +129,8 @@ export const AuthService = {
   signOut: async (): Promise<{ error: string | null }> => {
     try {
       // Sign out from Google if signed in
-      const isSignedIn = await GoogleSignin.isSignedIn();
-      if (isSignedIn) {
+      const currentUser = await GoogleSignin.getCurrentUser();
+      if (currentUser) {
         await GoogleSignin.signOut();
       }
 
