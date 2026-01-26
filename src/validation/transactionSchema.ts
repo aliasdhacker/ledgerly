@@ -3,7 +3,7 @@
 import { TransactionCreate, TransactionUpdate, TransferCreate } from '../types';
 import { createValidator, validators } from './validator';
 
-const { required, string, number, positiveNumber, boolean, date, oneOf, minLength, maxLength } = validators;
+const { required, string, positiveNumber, boolean, date, oneOf, minLength, maxLength } = validators;
 
 const TRANSACTION_TYPES = ['debit', 'credit'] as const;
 

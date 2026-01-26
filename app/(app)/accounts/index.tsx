@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
+import { COLORS, Typography, Spacing } from '../../../src/constants';
 import { MoneyText, Card, LoadingSpinner, EmptyState } from '../../../src/components';
 import { AccountCard } from '../../../src/components/accounts';
 import { useAccounts } from '../../../src/hooks/v2';

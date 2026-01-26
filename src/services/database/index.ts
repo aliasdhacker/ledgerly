@@ -271,13 +271,13 @@ export const initDatabase = (): void => {
 
   // Run pending migrations
   for (let v = currentVersion + 1; v <= SCHEMA_VERSION; v++) {
-    console.log(`Running migration to version ${v}...`);
+    if (__DEV__) console.log(`Running migration to version ${v}...`);
     runMigration(v);
     setSchemaVersion(v);
-    console.log(`Migration to version ${v} complete.`);
+    if (__DEV__) console.log(`Migration to version ${v} complete.`);
   }
 
-  console.log(`Database initialized at version ${SCHEMA_VERSION}`);
+  if (__DEV__) console.log(`Database initialized at version ${SCHEMA_VERSION}`);
 };
 
 // Reset database (for development/testing)

@@ -5,13 +5,12 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius, CommonStyles } from '../../../src/constants';
-import { Card, LoadingSpinner } from '../../../src/components';
+import { LoadingSpinner } from '../../../src/components';
 import { OCRService, DocumentType, OCRResult, OCRTransaction } from '../../../src/services/OCRService';
 import { TransactionService } from '../../../src/services/v2';
 import { useAccounts } from '../../../src/hooks/v2';

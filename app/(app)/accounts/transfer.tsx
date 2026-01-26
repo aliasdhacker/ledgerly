@@ -38,7 +38,6 @@ export default function TransferScreen() {
   }, [fromAccountId, accounts]);
 
   const bankAccounts = accounts.filter((a) => a.type === 'bank');
-  const creditAccounts = accounts.filter((a) => a.type === 'credit');
 
   const handleTransfer = () => {
     if (!fromAccount) {

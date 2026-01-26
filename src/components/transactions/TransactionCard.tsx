@@ -3,7 +3,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, Spacing, BorderRadius, Typography } from '../../constants';
+import { COLORS, Spacing, Typography } from '../../constants';
 import { MoneyText } from '../common/MoneyText';
 import { formatDate } from '../../utils';
 import { TransactionType } from '../../types/common';
@@ -29,9 +29,15 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   const isDebit = transaction.type === TransactionType.DEBIT;
   const displayAmount = isDebit ? -transaction.amount : transaction.amount;
 
+  const accessibilityLabel = `${transaction.description}, ${isDebit ? 'expense' : 'income'} ${transaction.amount.toLocaleString()} dollars${categoryName ? `, category ${categoryName}` : ''}${showDate ? `, ${formatDate(transaction.date, 'short')}` : ''}`;
+
   return (
     <Pressable
       onPress={onPress}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={onPress ? "Double tap to view transaction details" : undefined}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={[styles.iconContainer, { backgroundColor: categoryColor + '20' }]}>

@@ -3,9 +3,6 @@
 
 import { TransactionRepository, AccountRepository, PayableRepository, CategoryRepository } from '../../repositories';
 import { formatMoney, formatDate } from '../../utils';
-import type { Transaction } from '../../types/transaction';
-import type { Account } from '../../types/account';
-import type { Payable } from '../../types/payable';
 
 export interface ExportOptions {
   startDate?: string;

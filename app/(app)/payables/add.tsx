@@ -12,7 +12,6 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius, CommonStyles } from '../../../src/constants';
 import { usePayables } from '../../../src/hooks/v2';
 import { RecurrenceFrequency } from '../../../src/types/common';

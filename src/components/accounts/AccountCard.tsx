@@ -30,9 +30,19 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
   const { iconName, iconColor } = getIconAndColor();
 
+  const getAccessibilityLabel = () => {
+    const typeLabel = isCredit ? 'Credit card' : isLoan ? 'Loan' : 'Bank account';
+    const balanceLabel = `Balance ${account.balance < 0 ? 'negative ' : ''}${Math.abs(account.balance).toLocaleString()} ${account.currency}`;
+    return `${account.name}, ${typeLabel}, ${balanceLabel}`;
+  };
+
   return (
     <Pressable
       onPress={onPress}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={getAccessibilityLabel()}
+      accessibilityHint={onPress ? "Double tap to view account details" : undefined}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}
     >
       <View style={styles.header}>

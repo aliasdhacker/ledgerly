@@ -10,6 +10,8 @@ interface CardProps {
   onPress?: () => void;
   variant?: 'default' | 'elevated' | 'outlined';
   padding?: 'none' | 'small' | 'medium' | 'large';
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -18,6 +20,8 @@ export const Card: React.FC<CardProps> = ({
   onPress,
   variant = 'default',
   padding = 'medium',
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   const variantStyle = styles[variant];
   const paddingStyle = paddingStyles[padding];
@@ -26,6 +30,10 @@ export const Card: React.FC<CardProps> = ({
     return (
       <Pressable
         onPress={onPress}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
         style={({ pressed }) => [
           styles.base,
           variantStyle,
@@ -40,7 +48,11 @@ export const Card: React.FC<CardProps> = ({
   }
 
   return (
-    <View style={[styles.base, variantStyle, paddingStyle, style]}>
+    <View
+      style={[styles.base, variantStyle, paddingStyle, style]}
+      accessible={!!accessibilityLabel}
+      accessibilityLabel={accessibilityLabel}
+    >
       {children}
     </View>
   );

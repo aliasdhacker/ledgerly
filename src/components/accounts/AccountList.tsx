@@ -1,7 +1,7 @@
 // Account list component for DriftMoney
 
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { COLORS, Spacing, Typography } from '../../constants';
 import { AccountCard } from './AccountCard';
 import { MoneyText } from '../common/MoneyText';

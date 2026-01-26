@@ -13,6 +13,8 @@ interface IconButtonProps {
   backgroundColor?: string;
   style?: ViewStyle;
   disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export const IconButton: React.FC<IconButtonProps> = ({
@@ -23,11 +25,18 @@ export const IconButton: React.FC<IconButtonProps> = ({
   backgroundColor,
   style,
   disabled = false,
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.button,
         backgroundColor && { backgroundColor },

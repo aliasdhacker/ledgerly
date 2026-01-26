@@ -3,7 +3,6 @@
 import { getDb } from './connection';
 import { execute, queryAll, getSetting, setSetting, now } from './helpers';
 import { generateId } from '../utils/idUtils';
-import { RecurrenceFrequency } from '../types/common';
 
 interface LegacyBill {
   id: string;
@@ -46,19 +45,6 @@ interface LegacyDebtTransaction {
   description: string;
   date: string;
   balance_after: number;
-}
-
-function mapLegacyFrequency(
-  freq: string | null
-): RecurrenceFrequency | undefined {
-  if (!freq) return undefined;
-  const map: Record<string, RecurrenceFrequency> = {
-    daily: RecurrenceFrequency.DAILY,
-    weekly: RecurrenceFrequency.WEEKLY,
-    biweekly: RecurrenceFrequency.BIWEEKLY,
-    monthly: RecurrenceFrequency.MONTHLY,
-  };
-  return map[freq];
 }
 
 export function migrateLegacyData(): { success: boolean; message: string } {

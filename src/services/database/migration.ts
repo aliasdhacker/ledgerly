@@ -5,9 +5,7 @@ import * as SQLite from 'expo-sqlite';
 import { getDatabase, initDatabase } from './index';
 import { categoryRepo } from './categoryRepo';
 import { accountRepo } from './accountRepo';
-import { transactionRepo } from './transactionRepo';
 import { payableRepo } from './payableRepo';
-import { generateId, today } from '../../utils';
 import { TransactionType, RecurrenceFrequency } from '../../types';
 
 const OLD_DB_NAME = 'driftmoney.db';
@@ -67,7 +65,7 @@ export const migrateFromOldSchema = async (): Promise<{ success: boolean; messag
     initDatabase();
     categoryRepo.initDefaults();
 
-    console.log('Starting migration from old schema...');
+    if (__DEV__) console.log('Starting migration from old schema...');
 
     // 1. Create a default checking account for existing transactions
     const defaultAccount = accountRepo.create({
@@ -97,7 +95,7 @@ export const migrateFromOldSchema = async (): Promise<{ success: boolean; messag
       debtToAccountMap.set(debt.id, account.id);
     }
 
-    console.log(`Migrated ${oldDebts.length} debts to credit accounts`);
+    if (__DEV__) console.log(`Migrated ${oldDebts.length} debts to credit accounts`);
 
     // 3. Migrate transactions
     const oldTransactions = oldDb.getAllSync(
@@ -146,7 +144,7 @@ export const migrateFromOldSchema = async (): Promise<{ success: boolean; messag
     // Update default account balance
     accountRepo.updateBalance(defaultAccount.id, runningBalance);
 
-    console.log(`Migrated ${oldTransactions.length} transactions, running balance: ${runningBalance}`);
+    if (__DEV__) console.log(`Migrated ${oldTransactions.length} transactions, running balance: ${runningBalance}`);
 
     // 4. Migrate bills to payables
     const oldBills = oldDb.getAllSync('SELECT * FROM bills') as OldBill[];
@@ -177,7 +175,7 @@ export const migrateFromOldSchema = async (): Promise<{ success: boolean; messag
       }
     }
 
-    console.log(`Migrated ${oldBills.length} bills to payables`);
+    if (__DEV__) console.log(`Migrated ${oldBills.length} bills to payables`);
 
     // 5. Mark migration as complete
     const db = getDatabase();

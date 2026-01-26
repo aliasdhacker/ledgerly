@@ -25,7 +25,7 @@ export const NotificationService = {
     }
 
     if (finalStatus !== 'granted') {
-      console.log('Notification permissions not granted');
+      if (__DEV__) console.log('Notification permissions not granted');
       return false;
     }
 
@@ -80,7 +80,7 @@ export const NotificationService = {
       setSetting('daily_reminder_minute', minute.toString());
       setSetting('daily_reminder_id', identifier);
 
-      console.log(`Daily reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
+      if (__DEV__) console.log(`Daily reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
       return identifier;
     } catch (error) {
       console.error('Failed to schedule daily reminder:', error);
@@ -97,7 +97,7 @@ export const NotificationService = {
       }
       setSetting('daily_reminder_enabled', 'false');
       setSetting('daily_reminder_id', '');
-      console.log('Daily reminder cancelled');
+      if (__DEV__) console.log('Daily reminder cancelled');
     } catch (error) {
       console.error('Failed to cancel daily reminder:', error);
     }

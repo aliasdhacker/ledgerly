@@ -7,10 +7,8 @@ import {
   Pressable,
   Alert,
   Share,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -28,7 +26,6 @@ interface DateRange {
 }
 
 export default function ExportScreen() {
-  const router = useRouter();
   const { accounts, loading: accountsLoading } = useAccounts();
   const [selectedType, setSelectedType] = useState<ExportType | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);

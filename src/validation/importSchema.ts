@@ -3,7 +3,7 @@
 import { ImportBatchCreate, RawImportTransaction } from '../types';
 import { createValidator, validators } from './validator';
 
-const { required, string, number, positiveNumber, date, oneOf, minLength, maxLength } = validators;
+const { required, string, positiveNumber, date, oneOf, minLength, maxLength } = validators;
 
 const TRANSACTION_TYPES = ['debit', 'credit'] as const;
 

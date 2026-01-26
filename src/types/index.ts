@@ -18,3 +18,6 @@ export * from './import';
 
 // Analytics
 export * from './trend';
+
+// AI
+export * from './ai';

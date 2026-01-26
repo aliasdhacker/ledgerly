@@ -3,7 +3,7 @@
 import { CategoryCreate, CategoryUpdate } from '../types';
 import { createValidator, validators } from './validator';
 
-const { required, string, boolean, minLength, maxLength, min } = validators;
+const { required, string, minLength, maxLength, min } = validators;
 
 export const validateCategoryCreate = createValidator<CategoryCreate>({
   name: [required, string, minLength(1), maxLength(50)],

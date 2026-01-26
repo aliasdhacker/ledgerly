@@ -7,14 +7,13 @@ import {
   Pressable,
   RefreshControl,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
 import { MoneyText, Card, LoadingSpinner, EmptyState, ProgressBar } from '../../../src/components';
 import { useBudgets } from '../../../src/hooks/v2';
 
 export default function BudgetsScreen() {
-  const router = useRouter();
   const { budgets, progress, summary, loading, refresh, getAlerts } = useBudgets();
 
   useFocusEffect(

@@ -11,7 +11,7 @@ import {
 import { useLocalSearchParams, useFocusEffect, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
-import { MoneyText, Card, LoadingSpinner, EmptyState } from '../../../src/components';
+import { Card, LoadingSpinner, EmptyState } from '../../../src/components';
 import { AccountCard } from '../../../src/components/accounts';
 import { TransactionCard } from '../../../src/components/transactions';
 import { useAccounts, useAccountTransactions } from '../../../src/hooks/v2';
@@ -59,8 +59,6 @@ export default function AccountDetailScreen() {
       </View>
     );
   }
-
-  const isCredit = account.type === 'credit';
 
   return (
     <>

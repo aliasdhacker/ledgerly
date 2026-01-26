@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius, CHART_COLORS } from '../../../src/constants';
-import { MoneyText, Card, LoadingSpinner, ProgressBar } from '../../../src/components';
+import { MoneyText, Card, LoadingSpinner } from '../../../src/components';
 import {
   useThisMonthSpending,
   useMonthlyTrend,
@@ -40,8 +40,6 @@ export default function TrendsScreen() {
   const topCategories = useMemo(() => {
     return [...categories].sort((a, b) => b.amount - a.amount).slice(0, 5);
   }, [categories]);
-
-  const maxCategoryAmount = topCategories[0]?.amount || 1;
 
   if (loading && categories.length === 0) {
     return (

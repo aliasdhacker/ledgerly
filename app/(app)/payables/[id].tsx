@@ -20,7 +20,7 @@ export default function PayableDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getById, markPaid, markUnpaid, remove, refresh } = usePayables();
-  const { accounts, getBankAccounts } = useAccounts();
+  const { getBankAccounts } = useAccounts();
   const [loading, setLoading] = useState(true);
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');

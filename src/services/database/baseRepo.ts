@@ -1,7 +1,6 @@
 // Base repository with common CRUD operations
 
 import { getDatabase } from './index';
-import { SyncStatus } from '../../types';
 
 export interface BaseRow {
   id: string;

@@ -221,22 +221,24 @@ export function runMigrations(): void {
   const pendingMigrations = migrations.filter((m) => m.version > currentVersion);
 
   if (pendingMigrations.length === 0) {
-    console.log(`[DB] Database is up to date (v${currentVersion})`);
+    if (__DEV__) console.log(`[DB] Database is up to date (v${currentVersion})`);
     return;
   }
 
-  console.log(
-    `[DB] Running ${pendingMigrations.length} migrations (v${currentVersion} → v${DB_VERSION})`
-  );
-
-  for (const migration of pendingMigrations) {
-    console.log(`[DB] Running migration v${migration.version}...`);
-    migration.up();
-    setSetting('db_version', migration.version.toString());
-    console.log(`[DB] Migration v${migration.version} complete`);
+  if (__DEV__) {
+    console.log(
+      `[DB] Running ${pendingMigrations.length} migrations (v${currentVersion} → v${DB_VERSION})`
+    );
   }
 
-  console.log(`[DB] All migrations complete. Database is now at v${DB_VERSION}`);
+  for (const migration of pendingMigrations) {
+    if (__DEV__) console.log(`[DB] Running migration v${migration.version}...`);
+    migration.up();
+    setSetting('db_version', migration.version.toString());
+    if (__DEV__) console.log(`[DB] Migration v${migration.version} complete`);
+  }
+
+  if (__DEV__) console.log(`[DB] All migrations complete. Database is now at v${DB_VERSION}`);
 }
 
 export function initializeDatabase(): void {

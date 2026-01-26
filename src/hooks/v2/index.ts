@@ -16,3 +16,13 @@ export {
   useThisMonthSpending,
   useTopCategories,
 } from './useTrends';
+
+// AI Hooks
+export {
+  useAIStatus,
+  useCategorySuggestion,
+  useAnomalyDetection,
+  useBudgetRecommendations,
+  useSpendingInsights,
+  useCashFlowForecast,
+} from './useAI';

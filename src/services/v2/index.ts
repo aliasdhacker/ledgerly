@@ -37,3 +37,13 @@ export type {
 
 export { ExportService } from './ExportService';
 export type { ExportOptions, ExportResult } from './ExportService';
+
+export { AIService } from '../ai';
+export type {
+  AIConfig,
+  AIHealthStatus,
+  CategorySuggestion,
+  SpendingAnomaly,
+  BudgetRecommendation,
+  SpendingInsight,
+} from '../../types/ai';

@@ -10,7 +10,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, Typography, Spacing, BorderRadius, CommonStyles, GOAL_COLORS } from '../../../src/constants';
 import { MoneyText, Card, LoadingSpinner, EmptyState, ProgressBar } from '../../../src/components';
@@ -18,7 +18,6 @@ import { useGoals } from '../../../src/hooks/v2';
 import type { GoalProgress } from '../../../src/types/goal';
 
 export default function GoalsScreen() {
-  const router = useRouter();
   const { goals, progress, summary, loading, refresh, addAmount } = useGoals();
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<GoalProgress | null>(null);
