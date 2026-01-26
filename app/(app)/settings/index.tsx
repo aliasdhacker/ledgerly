@@ -19,6 +19,7 @@ import { deleteAllData } from '../../../src/db';
 import { useAuthContext } from '../../../src/contexts/AuthContext';
 import { useSyncContext } from '../../../src/contexts/SyncContext';
 import { COLORS, Typography, Spacing, BorderRadius } from '../../../src/constants';
+import { generateTestData } from '../../../src/utils/generateTestData';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const [reminderTime, setReminderTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isGeneratingData, setIsGeneratingData] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,6 +136,33 @@ export default function SettingsScreen() {
             setIsSigningOut(false);
             if (result.error) {
               Alert.alert('Error', result.error);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleGenerateTestData = async () => {
+    Alert.alert(
+      'Generate Test Data',
+      'This will add sample accounts, transactions, bills, budgets, and goals to your account. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate',
+          onPress: async () => {
+            setIsGeneratingData(true);
+            try {
+              const result = await generateTestData();
+              Alert.alert(
+                'Test Data Generated',
+                `Created:\n- ${result.accounts} accounts\n- ${result.transactions} transactions\n- ${result.payables} bills\n- ${result.budgets} budgets\n- ${result.goals} goals`
+              );
+            } catch (error) {
+              Alert.alert('Error', 'Failed to generate test data');
+            } finally {
+              setIsGeneratingData(false);
             }
           },
         },
@@ -355,6 +384,24 @@ export default function SettingsScreen() {
         </View>
       </View>
 
+      {/* Developer Tools */}
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer Tools</Text>
+          <Pressable
+            style={[styles.devButton, isGeneratingData && styles.devButtonDisabled]}
+            onPress={handleGenerateTestData}
+            disabled={isGeneratingData}
+          >
+            {isGeneratingData ? (
+              <ActivityIndicator color={COLORS.primary} size="small" />
+            ) : (
+              <Text style={styles.devButtonText}>Generate Test Data</Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
       {/* Danger Zone */}
       <View style={styles.dangerSection}>
         <Text style={styles.dangerSectionTitle}>Danger Zone</Text>
@@ -549,5 +596,21 @@ const styles = StyleSheet.create({
     ...Typography.bodyBold,
     color: COLORS.white,
     letterSpacing: 1,
+  },
+  devButton: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    alignItems: 'center',
+  },
+  devButtonDisabled: {
+    opacity: 0.6,
+  },
+  devButtonText: {
+    ...Typography.body,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });
