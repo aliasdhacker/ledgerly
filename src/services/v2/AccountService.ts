@@ -185,7 +185,7 @@ export const AccountService = {
       totalBankBalance: AccountRepository.getTotalBalance('bank'),
       totalCreditBalance: AccountRepository.getTotalBalance('credit'),
       totalLoanBalance,
-      netWorth: AccountRepository.getNetWorth() - totalLoanBalance,
+      netWorth: AccountRepository.getNetWorth(),
       accountCount: allAccounts.length,
       activeAccountCount: activeAccounts.length,
     };
