@@ -19,8 +19,8 @@ This document tracks all issues, fixes, and features required for Release Candid
 | Stage 1 | Critical Bug Fixes | ✅ Complete | 4 (all fixed) |
 | Stage 2 | High Priority Fixes | ✅ Complete | 8 (all fixed) |
 | Stage 3 | Medium Priority Fixes | ✅ Complete | 10 (all addressed) |
-| Stage 4 | AI Features - Foundation | Not Started | 2 |
-| Stage 5 | AI Features - Intelligence | Not Started | 4 |
+| Stage 4 | AI Features - Foundation | ✅ Complete | 2 |
+| Stage 5 | AI Features - Intelligence | ✅ Complete | 4 |
 | Stage 6 | Low Priority & Polish | Not Started | 11 |
 
 **Total Items**: 39
@@ -177,34 +177,42 @@ Infrastructure for AI capabilities. Required before Stage 5.
 
 | ID | Feature | Description | Status |
 |----|---------|-------------|--------|
-| AI-01 | Environment-based AI Config | Move Ollama URL to settings, add toggle | 🔴 Not Started |
-| AI-02 | AI Service Layer | Create unified AI service for LLM calls | 🔴 Not Started |
+| AI-01 | ~~AI Configuration~~ | Settings-based config with enable/disable | ✅ Fixed (2026-01-25) |
+| AI-02 | ~~AI Service Layer~~ | Unified service for LLM calls | ✅ Fixed (2026-01-25) |
 
-### AI-01: Environment-based AI Config
-**Current State**: OCR uses hardcoded Ollama URL
-**Goal**: User can configure AI endpoint in settings
-**Files to Create/Modify**:
-- `src/services/ai/config.ts` - AI configuration
-- `src/types/settings.ts` - Add AI settings type
-- `app/(app)/settings/index.tsx` - Add AI settings section
-- `src/db/schema.ts` - Add settings table if not exists
+### AI-01: AI Configuration ✅ COMPLETE
+**Created**: `src/types/ai.ts`
+- `AIConfig` interface with enabled, endpointUrl, model, timeout
+- `DEFAULT_AI_CONFIG` with sensible defaults
+- `AI_SETTINGS_KEYS` for storage
 
-### AI-02: AI Service Layer
-**Goal**: Unified interface for all AI operations
-**Files to Create**:
-- `src/services/ai/index.ts` - Main AI service
-- `src/services/ai/prompts.ts` - Prompt templates
-- `src/types/ai.ts` - AI-related types
+**AIService Config Methods**:
+- `getConfig()` - Read config from settings
+- `setConfig()` - Persist config to settings
+- `enable()` / `disable()` - Toggle AI features
+- `isEnabled()` - Check if AI is enabled
 
-**Interface**:
+### AI-02: AI Service Layer ✅ COMPLETE
+**Created**: `src/services/ai/index.ts`
+- Unified interface for all AI operations
+- Ollama-compatible LLM integration
+- Error handling and timeouts
+
+**Created**: `src/services/ai/prompts.ts`
+- `getCategorizeTransactionPrompt()` - Transaction categorization
+- `getAnomalyDetectionPrompt()` - Spending anomaly detection
+- `getBudgetRecommendationPrompt()` - Budget suggestions
+- `getSpendingInsightsPrompt()` - Spending insights
+- `parseJSONResponse()` - Safe JSON parsing from LLM
+
+**AIService Methods**:
 ```typescript
-interface AIService {
-  isAvailable(): Promise<boolean>;
-  categorizeTransaction(description: string): Promise<CategorySuggestion>;
-  analyzeSpending(transactions: Transaction[]): Promise<SpendingInsight[]>;
-  suggestBudget(categoryId: string, history: Transaction[]): Promise<BudgetSuggestion>;
-  detectAnomalies(transactions: Transaction[]): Promise<Anomaly[]>;
-}
+checkHealth(): Promise<AIHealthStatus>
+query(prompt: string): Promise<string | null>
+categorizeTransaction(description, amount, type): Promise<CategorySuggestion | null>
+detectAnomalies(transactions, averages): Promise<SpendingAnomaly[]>
+getBudgetRecommendations(categorySpending): Promise<BudgetRecommendation[]>
+getSpendingInsights(current, previous, income, expenses): Promise<SpendingInsight[]>
 ```
 
 ---
@@ -215,59 +223,63 @@ User-facing AI capabilities.
 
 | ID | Feature | Description | Status |
 |----|---------|-------------|--------|
-| AI-03 | Smart Category Detection | LLM-based transaction categorization | 🔴 Not Started |
-| AI-04 | Spending Anomaly Detection | Detect unusual transactions | 🔴 Not Started |
-| AI-05 | Budget Recommendations | Suggest realistic budgets from history | 🔴 Not Started |
-| AI-06 | Cash Flow Forecasting | Predict future balances | 🔴 Not Started |
+| AI-03 | Smart Category Detection | LLM-based transaction categorization | ✅ Complete |
+| AI-04 | Spending Anomaly Detection | Detect unusual transactions | ✅ Complete |
+| AI-05 | Budget Recommendations | Suggest realistic budgets from history | ✅ Complete |
+| AI-06 | Cash Flow Forecasting | Predict future balances | ✅ Complete |
 
-### AI-03: Smart Category Detection
-**Current**: Keyword matching in `TransactionService.ts:73-110`
-**Goal**: Send description to Ollama, get category with confidence
-**User Flow**:
-1. User imports/adds transaction
-2. AI suggests category
-3. User confirms or corrects
-4. (Future) Learn from corrections
+### AI-03: Smart Category Detection ✅ COMPLETE
+**Implementation**: `useCategorySuggestion` hook provides AI-powered category suggestions
+**How it works**:
+1. Hook calls `AIService.categorizeTransaction()` with description, amount, type
+2. Ollama LLM analyzes and returns category with confidence score
+3. Hook resolves category ID from category name using CategoryRepository
+4. Component receives suggestion with categoryId, categoryName, confidence, reasoning
 
-**Files**:
-- `src/services/ai/categorization.ts`
-- `src/services/v2/TransactionService.ts` (update)
-- `src/components/transactions/TransactionForm.tsx` (show suggestion)
+**Files Created/Updated**:
+- `src/hooks/v2/useAI.ts` - `useCategorySuggestion` hook
+- `src/services/ai/index.ts` - `categorizeTransaction()` method
+- `src/services/ai/prompts.ts` - `getCategorizeTransactionPrompt()`
 
-### AI-04: Spending Anomaly Detection
-**Goal**: Alert user to unusual transactions
-**Algorithm**:
-1. Calculate rolling average per category
-2. Calculate standard deviation
-3. Flag if transaction > avg + 2*stddev
+### AI-04: Spending Anomaly Detection ✅ COMPLETE
+**Implementation**: `useAnomalyDetection` hook detects unusual transactions
+**How it works**:
+1. Hook receives transactions and category averages
+2. Sends to `AIService.detectAnomalies()` for LLM analysis
+3. LLM identifies transactions that are unusually high, from unusual merchants, etc.
+4. Returns anomalies with type, severity, and explanation
 
-**Files**:
-- `src/services/ai/anomalies.ts`
-- `src/components/common/AnomalyAlert.tsx`
-- `app/(app)/index.tsx` (show alerts on home)
+**Files Created/Updated**:
+- `src/hooks/v2/useAI.ts` - `useAnomalyDetection` hook
+- `src/services/ai/index.ts` - `detectAnomalies()` method
+- `src/services/ai/prompts.ts` - `getAnomalyDetectionPrompt()`
 
-### AI-05: Budget Recommendations
-**Goal**: "Based on last 3 months, you typically spend $X on Y"
-**Algorithm**:
-1. Aggregate spending by category for past N months
-2. Calculate average and trend
-3. Suggest budget = avg + buffer
+### AI-05: Budget Recommendations ✅ COMPLETE
+**Implementation**: `useBudgetRecommendations` hook suggests budgets based on history
+**How it works**:
+1. Hook fetches last month's spending and 3-month averages by category
+2. Determines trend (up/down/stable) for each category
+3. Sends to `AIService.getBudgetRecommendations()` for analysis
+4. LLM suggests realistic budget amounts with reasoning
 
-**Files**:
-- `src/services/ai/budgetRecommendations.ts`
-- `app/(app)/trends/budgets.tsx` (show recommendations)
+**Files Created/Updated**:
+- `src/hooks/v2/useAI.ts` - `useBudgetRecommendations` hook
+- `src/services/ai/index.ts` - `getBudgetRecommendations()` method
+- `src/services/ai/prompts.ts` - `getBudgetRecommendationPrompt()`
 
-### AI-06: Cash Flow Forecasting
-**Goal**: Predict account balances for next 2-4 weeks
-**Algorithm**:
-1. Get recurring payables and expected dates
-2. Get average weekly spending by category
-3. Project balance: current - upcoming_payables - avg_weekly_spend
+### AI-06: Cash Flow Forecasting ✅ COMPLETE
+**Implementation**: `useCashFlowForecast` hook predicts balances for next 4 weeks
+**How it works**:
+1. Hook calculates current total balance (assets - liabilities)
+2. Fetches upcoming payables for next 28 days
+3. Calculates average weekly discretionary spending
+4. Sends to `AIService.getCashFlowForecast()` for projection
+5. Returns weekly forecasts with predicted balance, inflows, outflows, and risk assessment
 
-**Files**:
-- `src/services/ai/forecasting.ts`
-- `src/components/trends/ForecastChart.tsx`
-- `app/(app)/index.tsx` or `app/(app)/trends/index.tsx`
+**Files Created/Updated**:
+- `src/hooks/v2/useAI.ts` - `useCashFlowForecast` hook
+- `src/services/ai/index.ts` - `getCashFlowForecast()` method
+- `src/services/ai/prompts.ts` - `getCashFlowForecastPrompt()`
 
 ---
 
@@ -375,3 +387,5 @@ When working on an item:
 | 2026-01-25 | **Stage 1 Complete**: Fixed C-03 (NaN errors) and C-04 (settings table) |
 | 2026-01-25 | **Stage 2 Complete**: Fixed H-01 (OCR URL), H-05 (dayOfMonth), H-07 (budget periods) |
 | 2026-01-25 | **Stage 3 Complete**: Added constants/app.ts, utils/sanitize.ts; verified hooks OK |
+| 2026-01-25 | **Stage 4 Complete**: Created AI types, service layer, and prompt templates |
+| 2026-01-25 | **Stage 5 Complete**: All AI hooks implemented (category, anomaly, budget, forecast) |
