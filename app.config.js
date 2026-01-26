@@ -1,6 +1,9 @@
 // Dynamic Expo config that injects environment variables at build time
 // Credentials are read from .env file (gitignored) and baked into the app
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 export default {
   expo: {
     name: 'Driftmoney',
