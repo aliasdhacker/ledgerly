@@ -50,14 +50,14 @@ export default function AccountsScreen() {
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>Bank Balance</Text>
-                <MoneyText amount={summary.totalBankBalance} size="large" />
+                <MoneyText amount={summary.totalBankBalance} size="small" />
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>Credit Used</Text>
                 <MoneyText
                   amount={summary.totalCreditBalance}
-                  size="large"
+                  size="small"
                   style={summary.totalCreditBalance > 0 ? styles.debtAmount : undefined}
                 />
               </View>
@@ -68,7 +68,7 @@ export default function AccountsScreen() {
                     <Text style={styles.summaryLabel}>Loans</Text>
                     <MoneyText
                       amount={summary.totalLoanBalance}
-                      size="large"
+                      size="small"
                       style={styles.debtAmount}
                     />
                   </View>
