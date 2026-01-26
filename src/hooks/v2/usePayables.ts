@@ -160,9 +160,16 @@ export function useUpcomingPayables(days = 30): {
   payables: PayableWithStatus[];
   total: number;
   loading: boolean;
+  refresh: () => void;
 } {
   const [payables, setPayables] = useState<PayableWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(() => {
+    const upcoming = PayableService.getUpcoming(days);
+    setPayables(upcoming);
+    setLoading(false);
+  }, [days]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,5 +185,5 @@ export function useUpcomingPayables(days = 30): {
 
   const total = payables.reduce((sum, p) => sum + p.amount, 0);
 
-  return { payables, total, loading };
+  return { payables, total, loading, refresh };
 }

@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { draft, loading: draftLoading, refresh: refreshDraft } = useDraft();
   const overview = useFinancialOverview();
-  const { payables: upcomingPayables, total: upcomingTotal, loading: payablesLoading } = useUpcomingPayables(14);
+  const { payables: upcomingPayables, total: upcomingTotal, loading: payablesLoading, refresh: refreshPayables } = useUpcomingPayables(14);
   const { transactions: recentTransactions, loading: transactionsLoading } = useRecentTransactions(5);
 
   const loading = draftLoading || overview.loading || payablesLoading || transactionsLoading;
@@ -32,7 +32,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshDraft();
-    }, [refreshDraft])
+      refreshPayables();
+    }, [refreshDraft, refreshPayables])
   );
 
   const safeToSpend = draft?.safeToSpend ?? 0;
