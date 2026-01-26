@@ -2,6 +2,7 @@
 // Provides AI-powered features using local LLM (Ollama)
 
 import { getSetting, setSetting } from '../../db/helpers';
+import { CredentialService } from '../CredentialService';
 import {
   AIConfig,
   DEFAULT_AI_CONFIG,
@@ -98,8 +99,16 @@ export const AIService = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+      // Get auth header if credentials are configured
+      const authHeader = await CredentialService.getBasicAuthHeader();
+      const headers: Record<string, string> = {};
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       const response = await fetch(`${config.endpointUrl}/api/tags`, {
         method: 'GET',
+        headers,
         signal: controller.signal,
       });
 
@@ -110,7 +119,7 @@ export const AIService = {
           available: false,
           endpoint: config.endpointUrl,
           model: config.model,
-          error: `HTTP ${response.status}`,
+          error: `HTTP ${response.status}${response.status === 401 ? ' (Authentication required)' : ''}`,
         };
       }
 
@@ -163,9 +172,16 @@ export const AIService = {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
+      // Get auth header if credentials are configured
+      const authHeader = await CredentialService.getBasicAuthHeader();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       const response = await fetch(`${config.endpointUrl}/api/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(request),
         signal: controller.signal,
       });

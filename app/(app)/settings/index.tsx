@@ -288,6 +288,14 @@ export default function SettingsScreen() {
           </View>
           <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
         </Pressable>
+
+        <Pressable style={styles.menuItem} onPress={() => router.push('/settings/api')}>
+          <View style={styles.menuItemContent}>
+            <Ionicons name="key-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.menuItemText}>API Settings</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+        </Pressable>
       </View>
 
       {/* Notifications Section */}

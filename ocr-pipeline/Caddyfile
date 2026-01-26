@@ -1,0 +1,13 @@
+api.acarr.org {
+    basic_auth {
+        apiuser $2a$14$kOsDSn5QO.6jC9q6SNgSW.YhGF37BZQ6t8Fb6hDNkAGNV2PFvT7Ty
+    }
+    reverse_proxy api:8000
+}
+
+ollama.acarr.org {
+    basic_auth {
+        apiuser $2a$14$kOsDSn5QO.6jC9q6SNgSW.YhGF37BZQ6t8Fb6hDNkAGNV2PFvT7Ty
+    }
+    reverse_proxy ollama:11434
+}

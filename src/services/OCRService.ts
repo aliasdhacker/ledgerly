@@ -5,13 +5,14 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { TransactionType, RecurrenceFrequency } from '../types/common';
 import { getSetting, setSetting } from '../db/helpers';
+import { CredentialService } from './CredentialService';
 
 // OCR Pipeline URL configuration
 // Stored in settings for runtime configurability
 const OCR_SETTINGS_KEY = 'ocr_pipeline_url';
 const DEFAULT_OCR_URL = __DEV__
   ? 'http://localhost:8000'
-  : 'https://your-production-url.com';
+  : 'https://api.acarr.org';
 
 function getOCRPipelineUrl(): string {
   const saved = getSetting(OCR_SETTINGS_KEY);
@@ -135,9 +136,16 @@ export const OCRService = {
    */
   async checkHealth(): Promise<OCRHealthStatus | null> {
     try {
+      // Get auth header if credentials are configured
+      const authHeader = await CredentialService.getBasicAuthHeader();
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       const response = await fetch(`${getOCRPipelineUrl()}/health`, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers,
       });
 
       if (!response.ok) return null;
@@ -178,13 +186,18 @@ export const OCRService = {
       } as any);
       formData.append('document_type', documentType);
 
+      // Get auth header if credentials are configured
+      const authHeader = await CredentialService.getBasicAuthHeader();
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       // Send to OCR pipeline
       const response = await fetch(`${getOCRPipelineUrl()}/parse`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -322,12 +335,17 @@ export const OCRService = {
         type: mimeType,
       } as any);
 
+      // Get auth header if credentials are configured
+      const authHeader = await CredentialService.getBasicAuthHeader();
+      const headers: Record<string, string> = { 'Accept': 'application/json' };
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       const response = await fetch(`${getOCRPipelineUrl()}/ocr-only`, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers,
       });
 
       if (!response.ok) {
