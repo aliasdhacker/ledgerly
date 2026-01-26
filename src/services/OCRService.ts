@@ -4,13 +4,19 @@
 
 import * as DocumentPicker from 'expo-document-picker';
 import { TransactionType, RecurrenceFrequency } from '../types/common';
+import { getSetting, setSetting } from '../db/helpers';
 
-// Configure your OCR pipeline URL
-// For development: use your local machine's IP
-// For production: use your server's public IP or domain
-const OCR_PIPELINE_URL = __DEV__
-  ? 'http://192.168.98.108:8000'
+// OCR Pipeline URL configuration
+// Stored in settings for runtime configurability
+const OCR_SETTINGS_KEY = 'ocr_pipeline_url';
+const DEFAULT_OCR_URL = __DEV__
+  ? 'http://localhost:8000'
   : 'https://your-production-url.com';
+
+function getOCRPipelineUrl(): string {
+  const saved = getSetting(OCR_SETTINGS_KEY);
+  return saved || DEFAULT_OCR_URL;
+}
 
 // ============================================================================
 // Document Types
@@ -129,7 +135,7 @@ export const OCRService = {
    */
   async checkHealth(): Promise<OCRHealthStatus | null> {
     try {
-      const response = await fetch(`${OCR_PIPELINE_URL}/health`, {
+      const response = await fetch(`${getOCRPipelineUrl()}/health`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
       });
@@ -173,7 +179,7 @@ export const OCRService = {
       formData.append('document_type', documentType);
 
       // Send to OCR pipeline
-      const response = await fetch(`${OCR_PIPELINE_URL}/parse`, {
+      const response = await fetch(`${getOCRPipelineUrl()}/parse`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -316,7 +322,7 @@ export const OCRService = {
         type: mimeType,
       } as any);
 
-      const response = await fetch(`${OCR_PIPELINE_URL}/ocr-only`, {
+      const response = await fetch(`${getOCRPipelineUrl()}/ocr-only`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -370,15 +376,26 @@ export const OCRService = {
    * Get the configured OCR pipeline URL
    */
   getBaseUrl(): string {
-    return OCR_PIPELINE_URL;
+    return getOCRPipelineUrl();
   },
 
   /**
-   * Update the OCR pipeline URL (for settings)
+   * Update the OCR pipeline URL (persisted to settings)
    */
   setBaseUrl(url: string): void {
-    // Note: This would need to be persisted to settings
-    // For now, it's compile-time configured
-    console.warn('setBaseUrl requires app restart to take effect');
+    if (!url || !url.startsWith('http')) {
+      console.warn('Invalid OCR URL - must start with http:// or https://');
+      return;
+    }
+    // Remove trailing slash if present
+    const cleanUrl = url.replace(/\/$/, '');
+    setSetting(OCR_SETTINGS_KEY, cleanUrl);
+  },
+
+  /**
+   * Reset OCR URL to default
+   */
+  resetBaseUrl(): void {
+    setSetting(OCR_SETTINGS_KEY, DEFAULT_OCR_URL);
   },
 };

@@ -25,8 +25,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   overBudgetColor = COLORS.error,
   style,
 }) => {
-  const clampedProgress = Math.min(100, Math.max(0, progress));
-  const isOverBudget = progress > 100;
+  // Guard against NaN, undefined, or non-finite values
+  const safeProgress = isNaN(progress) || !isFinite(progress) ? 0 : progress;
+  const clampedProgress = Math.min(100, Math.max(0, safeProgress));
+  const isOverBudget = safeProgress > 100;
   const displayProgress = isOverBudget ? 100 : clampedProgress;
   const fillColor = isOverBudget ? overBudgetColor : color;
 
@@ -52,7 +54,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             isOverBudget && { color: overBudgetColor },
           ]}
         >
-          {Math.round(progress)}%
+          {Math.round(safeProgress)}%
         </Text>
       )}
     </View>

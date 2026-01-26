@@ -71,14 +71,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         )}
       </View>
 
-      {showDetails && isCredit && account.creditLimit && (
+      {showDetails && isCredit && account.creditLimit && account.creditLimit > 0 && (
         <View style={styles.creditDetails}>
           <View style={styles.utilizationBar}>
             <View
               style={[
                 styles.utilizationFill,
                 {
-                  width: `${Math.min(100, (account.balance / account.creditLimit) * 100)}%`,
+                  width: `${Math.min(100, Math.max(0, (account.balance / account.creditLimit) * 100))}%`,
                   backgroundColor:
                     account.balance / account.creditLimit > 0.9
                       ? COLORS.error
@@ -118,14 +118,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         </View>
       )}
 
-      {showDetails && isLoan && account.loanPrincipal && (
+      {showDetails && isLoan && account.loanPrincipal && account.loanPrincipal > 0 && (
         <View style={styles.creditDetails}>
           <View style={styles.utilizationBar}>
             <View
               style={[
                 styles.utilizationFill,
                 {
-                  width: `${account.loanPercentPaid ?? 0}%`,
+                  width: `${Math.min(100, Math.max(0, account.loanPercentPaid ?? 0))}%`,
                   backgroundColor: COLORS.success,
                 },
               ]}

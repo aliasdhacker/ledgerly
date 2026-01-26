@@ -3,7 +3,7 @@
 
 import { PayableRepository, TransactionRepository, AccountRepository } from '../../repositories';
 import { withTransaction } from '../../db';
-import { validatePayableCreate, validatePayableUpdate } from '../../validation';
+import { validatePayableCreate, validatePayableUpdate, validateRecurrenceRule } from '../../validation';
 import type { Payable, PayableCreate, PayableUpdate, PayablePayment, PayableWithStatus } from '../../types/payable';
 import type { Transaction } from '../../types/transaction';
 import { TransactionType, RecurrenceFrequency } from '../../types/common';
@@ -59,6 +59,14 @@ export const PayableService = {
       return failure(Object.values(validation.errors));
     }
 
+    // Validate recurrence rule if provided
+    if (data.isRecurring && data.recurrenceRule) {
+      const ruleValidation = validateRecurrenceRule(data.recurrenceRule);
+      if (!ruleValidation.success) {
+        return failure(Object.values(ruleValidation.errors));
+      }
+    }
+
     const payable = PayableRepository.create(data);
     return success(payable);
   },
@@ -67,6 +75,14 @@ export const PayableService = {
     const validation = validatePayableUpdate(data);
     if (!validation.success) {
       return failure(Object.values(validation.errors));
+    }
+
+    // Validate recurrence rule if provided
+    if (data.recurrenceRule) {
+      const ruleValidation = validateRecurrenceRule(data.recurrenceRule);
+      if (!ruleValidation.success) {
+        return failure(Object.values(ruleValidation.errors));
+      }
     }
 
     const payable = PayableRepository.update(id, data);

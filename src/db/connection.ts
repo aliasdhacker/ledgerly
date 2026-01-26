@@ -10,6 +10,13 @@ let _db: SQLite.SQLiteDatabase | null = null;
 export function getDb(): SQLite.SQLiteDatabase {
   if (!_db) {
     _db = SQLite.openDatabaseSync(DB_NAME);
+    // Ensure settings table exists immediately - needed for migration version tracking
+    _db.execSync(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
   }
   return _db;
 }

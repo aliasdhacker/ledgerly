@@ -4,3 +4,4 @@ export * from './idUtils';
 export * from './dateUtils';
 export * from './moneyUtils';
 export * from './formatUtils';
+export * from './sanitize';

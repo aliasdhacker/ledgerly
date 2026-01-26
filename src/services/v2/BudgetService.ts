@@ -136,7 +136,9 @@ export const BudgetService = {
    * Gets the start and end dates for the current period of a budget
    */
   getPeriodDates(budget: Budget): { start: string; end: string } {
+    // Normalize to midnight for consistent date calculations
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     let start: Date;
     let end: Date;
 
@@ -149,18 +151,17 @@ export const BudgetService = {
       case RecurrenceFrequency.WEEKLY:
         // Week starts on Sunday
         const dayOfWeek = today.getDay();
-        start = new Date(today);
-        start.setDate(today.getDate() - dayOfWeek);
-        end = new Date(start);
-        end.setDate(start.getDate() + 6);
+        start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dayOfWeek);
+        end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
         break;
 
       case RecurrenceFrequency.BIWEEKLY:
-        // Two weeks from budget start date
-        const budgetStart = new Date(budget.startDate);
-        const weeksDiff = Math.floor((today.getTime() - budgetStart.getTime()) / (14 * 24 * 60 * 60 * 1000));
+        // Two weeks from budget start date, normalized to midnight
+        const budgetStart = new Date(budget.startDate + 'T00:00:00');
+        const daysDiff = Math.floor((today.getTime() - budgetStart.getTime()) / (24 * 60 * 60 * 1000));
+        const periodNumber = Math.floor(daysDiff / 14);
         start = new Date(budgetStart);
-        start.setDate(budgetStart.getDate() + weeksDiff * 14);
+        start.setDate(budgetStart.getDate() + periodNumber * 14);
         end = new Date(start);
         end.setDate(start.getDate() + 13);
         break;
