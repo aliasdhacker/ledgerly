@@ -19,7 +19,7 @@ export interface AIConfig {
  */
 export const DEFAULT_AI_CONFIG: AIConfig = {
   enabled: false,
-  endpointUrl: __DEV__ ? 'http://localhost:11434' : 'https://ollama.acarr.org',
+  endpointUrl: 'https://ollama.acarr.org',
   model: 'llama3.2',
   timeout: 30000,
 };

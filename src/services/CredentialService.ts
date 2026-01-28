@@ -26,6 +26,10 @@ export const CredentialService = {
     if (!extra.apiUsername || !extra.apiPassword) {
       return null;
     }
+    const masked = extra.apiPassword.length > 2
+      ? extra.apiPassword[0] + '*'.repeat(extra.apiPassword.length - 2) + extra.apiPassword[extra.apiPassword.length - 1]
+      : '***';
+    console.log(`[CredentialService] username="${extra.apiUsername}" password="${masked}" (len=${extra.apiPassword.length})`);
     return {
       username: extra.apiUsername,
       password: extra.apiPassword,

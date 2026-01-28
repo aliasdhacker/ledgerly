@@ -2,7 +2,8 @@
 // Credentials are read from .env file (gitignored) and baked into the app
 
 // Load environment variables from .env file
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 export default {
   expo: {
